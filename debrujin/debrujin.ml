@@ -38,4 +38,37 @@ let beta_red (t: term) =
   | App(Abs(a), b) -> subst a b 1
   | _ -> t
 
+let rec free_var (t : term) (i : int) =
+  match t with
+    | Var(m) -> if m > i then 1 else 0
+    | XVar(_) -> 0
+    | Abs(t1) -> free_var t1 (i+1)
+    | App(t1, t2) -> (free_var t1 i) + (free_var t2 i)
 
+(*------------------------------ lsgima --------------------------------*)
+
+type s_subst =
+  | Yvar of name
+  | Id
+  | Shift
+  | Cons of s_term * s_subst
+  | Comp of s_subst * s_subst
+and s_term =
+  | S_One
+  | S_Xvar of name
+  | S_App of s_term * s_term
+  | S_Abs of s_term
+  | S_Tsub of s_term * s_subst
+
+let rec s_shift_n (n : int) =
+  match n with
+  | 0 -> Id
+  | 1 -> Shift
+  | n -> Comp(Shift, s_shift_n (n-1))
+
+let rec precooking (l_t : term) (n : int) : s_term =
+  match l_t with
+    | Var(k) -> S_Tsub (S_One, s_shift_n (k-1)) (* Var k *)
+    | XVar(nam) -> S_Tsub (S_Xvar(nam), s_shift_n (n))
+    | Abs(t1) -> S_Abs(precooking t1 (n+1))
+    | App(t1, t2) -> S_App((precooking t1 n), (precooking t2 n))
