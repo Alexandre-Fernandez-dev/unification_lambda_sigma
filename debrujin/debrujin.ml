@@ -250,17 +250,11 @@ let l2 = App(
           )
         );;
 
-(* Lambda Sigma *)
-let s1 = S_App(S_Abs(K "t", S_Xvar("x")), S_Xvar("42"))
-;;
 
 (*-------------------- Testing values : all of them should be true --------------------*)
 (* /!\ WARNING: use '=' not "==" for comparing terms *)
 
 test_reduction (beta_red l1) (Var(42));;
-print_string (print_term l2);;
-print_string "\n";;
-print_string (print_term (beta_red(beta_red l2)));;
-print_string "\n";;
+test_reduction (beta_red (beta_red l2)) (Var(2));;
 
 (* test_Sreduction s1 s1;; *)
