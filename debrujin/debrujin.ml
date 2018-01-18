@@ -92,69 +92,133 @@ let rec precooking (l_t : term) (n : int) : s_term =
   | Abs(ty, t1) -> S_Abs(ty, precooking t1 (n+1))
   | App(t1, t2) -> S_App((precooking t1 n), (precooking t2 n))
 
+exception No_unshift
 
+let rec unshift_s (t : s_term) = (* not sure what i am doing here *)
+  match t with
+  | S_One          -> raise No_unshift
+  | S_Xvar (n)     -> S_Xvar (n)
+  | S_App (t1, t2) -> S_App (unshift_s t1, unshift_s t2)
+  | S_Abs (ty, t)  -> S_Abs (ty, unshift_s t)
+  | S_Tsub (t, s)  -> S_Tsub (t, (unshift_sub_s s))
+and unshift_sub_s (s : s_subst) =
+  match s with
+  | Id            -> Id
+  | Shift         -> Id
+  | Cons (t, s)   -> Cons (t, s)
+  | Comp (s1, s2) -> if s2 = Shift
+                     then s1
+                     else unshift_sub_s s2
 
 (* -------------------- reduction Hugo-style ------------------ *)
-
-let app_red (t: s_term) =
+let beta_red_s (t: s_term) =
   match t with
-  | S_Tsub (S_App(a,b), s) -> S_App(S_Tsub(a,s), S_Tsub (b,s))
+  | S_App (S_Abs (ty, a), b) -> S_Tsub (a, Cons (b, Id))
   | _ -> t
 
-let varcons_red (t: s_term) =
+let app_red_s (t: s_term) =
   match t with
-  | S_Tsub (S_One, Cons(a,b)) -> a
+  | S_Tsub (S_App (a,b), s) -> S_App (S_Tsub (a,s), S_Tsub (b,s))
   | _ -> t
 
-let id_red (t: s_term) =
+let varcons_red_s (t: s_term) =
+  match t with
+  | S_Tsub (S_One, Cons (a,b)) -> a
+  | _ -> t
+
+let id_red_s (t: s_term) =
   match t with
   | S_Tsub (a, Id) -> a
   | _ -> t
 
-let abs_red (t: s_term) =
+let abs_red_s (t: s_term) =
   match t with
-  | S_Tsub (S_Abs(ty, a), s) -> S_Abs(ty, S_Tsub(a, Cons(S_One, Comp(s, Shift))))
+  | S_Tsub (S_Abs (ty, a), s) -> S_Abs (ty, S_Tsub (a, Cons (S_One, Comp (s, Shift))))
   | _ -> t
 
-let clos_red (t: s_term) =
+let clos_red_s (t: s_term) =
   match t with
-  | S_Tsub(S_Tsub(a,s),t) -> S_Tsub(a, Comp(s,t))
+  | S_Tsub (S_Tsub (a,s),t) -> S_Tsub (a, Comp (s,t))
   | _ -> t
 
-let idl_red (s: s_subst) =
+let idl_red_s (s: s_subst) =
   match s with
-  | Comp(Id, s1) -> s1
+  | Comp (Id, s1) -> s1
   | _ -> s
 
-let shiftcons_red (s: s_subst) =
+let shiftcons_red_s (s: s_subst) =
   match s with
-  | Comp(Shift, Cons(a,s1)) -> s1
+  | Comp (Shift, Cons (a,s1)) -> s1
   | _ -> s
 
-let assenv_red (s: s_subst) =
+let assenv_red_s (s: s_subst) =
   match s with
-  | Comp(Comp(s1, s2), s3) -> Comp(s1, Comp(s2,s3))
+  | Comp (Comp (s1, s2), s3) -> Comp (s1, Comp (s2,s3))
   | _ -> s
 
-let mapenv_red (s: s_subst) =
+let mapenv_red_s (s: s_subst) =
   match s with
-  | Comp(Cons(a,s1),t) -> Cons(S_Tsub(a,t), Comp(s1,t))
+  | Comp (Cons (a,s1),t) -> Cons (S_Tsub (a,t), Comp (s1,t))
   | _ -> s
 
-let idr_red (s: s_subst) =
+let idr_red_s (s: s_subst) =
   match s with
-  | Comp(s1, Id) -> s1
+  | Comp (s1, Id) -> s1
   | _ -> s
 
-let varshift_red (s: s_subst) =
+let varshift_red_s (s: s_subst) =
   match s with
-  | Cons(S_One, Shift) -> Id
+  | Cons (S_One, Shift) -> Id
   | _ -> s
 
-let scons_red (s: s_subst) =
+let scons_red_s (s: s_subst) =
   match s with
-  | Cons(S_Tsub(S_One, s1), Comp(Shift, s2)) -> if s1 = s2 then s1 else s
+  | Cons (S_Tsub (S_One, s1), Comp (Shift, s2)) -> if s1 = s2 then s1 else s
   | _ -> s
+
+let eta_red_s (t: s_term) =
+  match t with
+  | S_Abs (ty, S_App(a, S_One)) -> unshift_s a
+  | _ -> t
+
+let reduce_term_s (t : s_term) =
+  match t with
+  | S_App (S_Abs (ty, a), b) -> S_Tsub (a, Cons (b, Id))
+  | S_Tsub (S_App (a,b), s) -> S_App (S_Tsub (a,s), S_Tsub (b,s))
+  | S_Tsub (S_One, Cons (a,b)) -> a
+  | S_Tsub (a, Id) -> a
+  | S_Tsub (S_Abs (ty, a), s) -> S_Abs (ty, S_Tsub (a, Cons (S_One, Comp (s, Shift))))
+  | S_Tsub (S_Tsub (a,s),t) -> S_Tsub (a, Comp (s,t))
+  | S_Abs (ty, S_App(a, S_One)) -> unshift_s a
+  | _ -> t
+
+let reduce_subst_s (s : s_subst) =
+  match s with
+  | Comp (Id, s1) -> s1
+  | Comp (Shift, Cons (a,s1)) -> s1
+  | Comp (Comp (s1, s2), s3) -> Comp (s1, Comp (s2,s3))
+  | Comp (Cons (a,s1),t) -> Cons (S_Tsub (a,t), Comp (s1,t))
+  | Comp (s1, Id) -> s1
+  | Cons (S_One, Shift) -> Id
+  | Cons (S_Tsub (S_One, s1), Comp (Shift, s2)) -> if s1 = s2 then s1 else s
+  | _ -> s
+  
+let propagate_s (t : s_term) (f : s_subst -> s_subst) = (* not sure what i am doing here maybe need rec*)
+  match t with
+  | S_One          -> S_One
+  | S_Xvar (n)     -> S_Xvar (n)
+  | S_Abs (ty, t)  -> S_Abs (ty, t)
+  | S_App (t1, t2) -> S_App (t1, t2)
+  | S_Tsub (t1, s) -> S_Tsub (t1, (f s))
+
+let rec normalize_t_s (t : s_term) = (* not sure what i am doing here *)
+  let reduced = reduce_term_s t in
+  if reduced = t then
+    let reduced_s = propagate_s t reduce_subst_s in
+    if reduced_s = t
+    then t
+    else normalize_t_s reduced_s
+  else normalize_t_s reduced
 
 exception No_inference
 
@@ -183,3 +247,5 @@ and type_check_cont c t_sub =
     ty_t::c_s
   | Comp(s1, s2) -> let c_s2 = type_check_cont c s2 in
     type_check_cont c_s2 s1 
+
+
