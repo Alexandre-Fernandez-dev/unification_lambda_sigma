@@ -1,3 +1,5 @@
+open Printf
+
 type name = string
 
 let eq_name n1 n2 = (n1 = n2)
@@ -96,6 +98,11 @@ let rec precooking (l_t : term) (n : int) : s_term =
 
 (* -------------------- reduction Hugo-style ------------------ *)
 
+let sbeta_red (t: s_term) =
+  match t with
+  | S_App (S_Abs(ty, a), b) -> S_Tsub(a, Cons(b, Id)) 
+  | _ -> t
+
 let app_red (t: s_term) =
   match t with
   | S_Tsub (S_App(a,b), s) -> S_App(S_Tsub(a,s), S_Tsub (b,s))
@@ -183,3 +190,77 @@ and type_check_cont c t_sub =
     ty_t::c_s
   | Comp(s1, s2) -> let c_s2 = type_check_cont c s2 in
     type_check_cont c_s2 s1 
+
+(*-------------------- Testing some reductions --------------------*)
+
+(* Function for testing *)
+let print_bool b =
+  print_string(string_of_bool b^"\n")
+;;
+
+let rec print_term (t: term) =
+  match t with
+  | Var n  -> "Var("^string_of_int n^")"
+  | XVar n -> "XVar("^n^")"
+  | Abs (ty, t1) -> "Abs("^print_term t1^")"
+  | App  (t1, t2) -> "App("^print_term t1^", "^print_term t2^")"
+
+let rec print_s_term (s: s_term) = 
+  match s with
+  | S_One -> "S_One"
+  | S_Xvar n -> "S_Xvar("^n^")"
+  | S_App (s1, s2)-> "S_App("^print_s_term s1^", "^print_s_term s2^")"
+  | S_Abs (ty, t) -> "S_Abs("^print_s_term t^")"
+  | S_Tsub (t, s) -> "S_Tsub("^print_s_term t^", "^print_s_subst s^")"
+and print_s_subst (s: s_subst) =
+  match s with
+  | Id -> "id"
+  | Shift -> "↑"
+  | Cons (t, s) -> "Cons("^print_s_term t^", "^print_s_subst s^")"
+  | Comp (s1, s2) -> "Comp("^print_s_subst s1^", "^print_s_subst s2^")"
+
+let test_reduction (t: term) (r: term) =
+  print_string ("TEST: "^print_term t);
+  print_string (" -> "^print_term r^" : ");
+  print_bool (t=r);
+  print_newline
+;;
+
+
+let test_Sreduction (t: s_term) (r: s_term) =
+  print_string ("TEST "^print_s_term t);
+  print_string (" -> "^print_s_term r^" : ");
+  print_bool (t=r);
+  print_newline
+;;
+
+(*-------------------- Writing examples --------------------*)
+
+(* Lambda *)
+let l1 = App(
+          Abs(K "t", Var(1)), 
+          Var(42)
+        );;
+
+let l2 = App(
+          Abs(K "t", Var(1)),
+          App(
+            Abs(K "t", Var(1)),
+            Var(2)
+          )
+        );;
+
+(* Lambda Sigma *)
+let s1 = S_App(S_Abs(K "t", S_Xvar("x")), S_Xvar("42"))
+;;
+
+(*-------------------- Testing values : all of them should be true --------------------*)
+(* /!\ WARNING: use '=' not "==" for comparing terms *)
+
+test_reduction (beta_red l1) (Var(42));;
+print_string (print_term l2);;
+print_string "\n";;
+print_string (print_term (beta_red(beta_red l2)));;
+print_string "\n";;
+
+(* test_Sreduction s1 s1;; *)
