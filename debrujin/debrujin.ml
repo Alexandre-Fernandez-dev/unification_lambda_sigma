@@ -110,6 +110,74 @@ and unshift_sub_s (s : s_subst) =
                      then s1
                      else unshift_sub_s s2
 
+(* check if term is a de brujin indice *)
+let rec is_number t =
+  match t with
+  | S_One         -> true
+  | S_Tsub (t, s) -> if s = Shift
+                     then check_is_number t
+                     else if t = S_One
+                          then check_is_shift_n s
+                          else false
+  | _ -> false
+and is_shift_n s =
+  match s with
+  | Shift         -> true
+  | Comp (s1, s2) -> (check_is_shift_n s1) && (check_is_shift_n s2)
+  | _ -> false
+
+let add_option_i o1 i =
+  match o1 with
+  | Some (n) -> Some (n+i)
+  | None -> None
+
+let add_option o1 o2 =
+  match o1,o2 with
+  | Some (n1), Some (n2) -> Some (n1+n2)
+  | _ -> None
+
+(* get the integer corresponding to a term representing a de brujin indice *)
+let rec get_number t =
+  match t with
+  | S_One         -> Some(1)
+  | S_Tsub (t, s) -> if s = Shift
+                     then add_option_i (get_number t) 1
+                     else if t = S_One
+                          then add_option_i (count_shift s) 1
+                          else None
+  | _ -> None
+and count_shift s =
+  match s with
+  | Shift         -> Some(1)
+  | Comp (s1, s2) -> add_option (count_shift s1) (count_shift s2)
+  | _ -> None
+
+let rec print_sigma_term t =
+  match t with
+  | S_One          -> print_string "1"
+  | S_Xvar (n)     -> print_string n
+  | S_Abs (ty, t)  -> print_string "λ.( "; print_sigma_term t;
+                      print_string " )"
+  | S_App (t1, t2) -> print_string "( "; print_sigma_term t1;
+                      print_string " ";
+                      print_sigma_term t2; print_string " )"
+  | S_Tsub (t1, s) -> let o_i = get_number t in
+                      match o_i with
+                        | None ->
+                          print_string "( ";
+                          print_sigma_term t1; print_string " [ ";
+                          print_sigma_subst s; print_string " ] )"
+                        | Some (i) ->
+                          print_int i
+and print_sigma_subst s =
+  match s with
+  | Id             -> print_string "id"
+  | Shift          -> print_string "↑"
+  | Cons (t1, s2)  -> print_sigma_term t1;
+                      print_string "."; print_sigma_subst s2
+  | Comp (s1, s2)  -> print_sigma_subst s1;
+                      print_string "∘"; print_sigma_subst s2
+
 (* -------------------- reduction Hugo-style ------------------ *)
 let beta_red_s (t: s_term) =
   match t with
@@ -181,17 +249,17 @@ let eta_red_s (t: s_term) =
   | S_Abs (ty, S_App(a, S_One)) -> unshift_s a
   | _ -> t
 
+(* All reduction rules for terms *)
 let reduce_term_s (t : s_term) =
   match t with
-  | S_App (S_Abs (ty, a), b) -> S_Tsub (a, Cons (b, Id))
   | S_Tsub (S_App (a,b), s) -> S_App (S_Tsub (a,s), S_Tsub (b,s))
   | S_Tsub (S_One, Cons (a,b)) -> a
   | S_Tsub (a, Id) -> a
   | S_Tsub (S_Abs (ty, a), s) -> S_Abs (ty, S_Tsub (a, Cons (S_One, Comp (s, Shift))))
   | S_Tsub (S_Tsub (a,s),t) -> S_Tsub (a, Comp (s,t))
-  | S_Abs (ty, S_App(a, S_One)) -> unshift_s a
   | _ -> t
 
+(* All reduction rules for subst *)
 let reduce_subst_s (s : s_subst) =
   match s with
   | Comp (Id, s1) -> s1
@@ -202,14 +270,75 @@ let reduce_subst_s (s : s_subst) =
   | Cons (S_One, Shift) -> Id
   | Cons (S_Tsub (S_One, s1), Comp (Shift, s2)) -> if s1 = s2 then s1 else s
   | _ -> s
-  
-let propagate_s (t : s_term) (f : s_subst -> s_subst) = (* not sure what i am doing here maybe need rec*)
+
+(* Attempt to leftmost outermost application of function on lambda sigma *)
+let rec transform_term (t : s_term) (f : s_term -> s_term) (g : s_subst -> s_subst) : s_term =
+  let transformed_term = f t in
+  match transformed_term with
+    | S_One          -> S_One
+    | S_Xvar (n)     -> S_Xvar (n)
+    | S_Abs (ty, t)  -> S_Abs (ty, transform_term t f g)
+    | S_App (t1, t2) -> let leftmost = transform_term t1 f g in
+                        if leftmost = t1
+                        then S_App (t1, transform_term t2 f g)
+                        else S_App (transform_term leftmost f g, t2)
+    | S_Tsub (t1, s) -> S_Tsub (transform_term t1 f g, transform_subst s f g)
+and transform_subst (s : s_subst) (f : s_term -> s_term) (g : s_subst -> s_subst) : s_subst =
+  let transformed_subst = g s in
+  match transformed_subst with
+    | Id            -> Id
+    | Shift         -> Shift
+    | Cons (t1, s2) -> Cons (transform_term t1 f g, transform_subst s2 f g)
+    | Comp (s1, s2) -> let leftmost = transform_subst s1 f g in
+                       if leftmost = s1
+                       then Comp (s1, transform_subst s2 f g)
+                       else Comp (transform_subst leftmost f g, s2)
+
+(* normalisation with lambda calculus *)
+let rec normalise_beta_eta (t : s_term) =
+  let reduced = transform_term t (beta_red_s) (fun x -> x) in
+  let reduced = transform_term reduced (eta_red_s) (fun x -> x) in
+  if reduced <> t then
+    normalise_beta_eta reduced
+  else
+    reduced
+
+(* term and subst rewriting for sigma calculus *)
+let rec normalise_sigma (t : s_term) =
+    let reduced = transform_term t reduce_term_s reduce_subst_s in
+    if reduced <> t then
+      normalise_sigma reduced
+    else
+      reduced
+
+(* normalisation for lambda sigma calculus *)
+let rec normalise_lambda_sigma (t : s_term) =
+  let reduced = normalise_beta_eta t in
+  let reduced = normalise_sigma reduced in
+  let reduced = normalise_beta_eta reduced in
+  if reduced <> t then
+    normalise_lambda_sigma reduced
+  else
+    reduced
+
+let two = S_Tsub (S_One, Shift)
+
+let three = S_Tsub (two, Shift)
+
+let four = S_Tsub (three, Shift)
+
+let test = S_App (three, S_Tsub (S_App ( four, S_Xvar ("H1") ), Cons (S_One, Id ) ) )
+
+let () = print_sigma_term test; print_string "\n"; print_sigma_term (normalise_lambda_sigma test)
+
+(*
+let rec propagate_s (t : s_term) (f : s_subst -> s_subst) = (* not sure what i am doing here maybe need rec*)
   match t with
   | S_One          -> S_One
   | S_Xvar (n)     -> S_Xvar (n)
-  | S_Abs (ty, t)  -> S_Abs (ty, t)
-  | S_App (t1, t2) -> S_App (t1, t2)
-  | S_Tsub (t1, s) -> S_Tsub (t1, (f s))
+  | S_Abs (ty, t)  -> S_Abs (ty, propagate_s t f)
+  | S_App (t1, t2) -> S_App (propagate_s t1 f, propagate_s t2 f)
+  | S_Tsub (t1, s) -> S_Tsub (propagate_s t1 f, (f s))
 
 let rec normalize_t_s (t : s_term) = (* not sure what i am doing here *)
   let reduced = reduce_term_s t in
@@ -219,6 +348,11 @@ let rec normalize_t_s (t : s_term) = (* not sure what i am doing here *)
     then t
     else normalize_t_s reduced_s
   else normalize_t_s reduced
+*)
+let rec length_type (t : ty) =
+  match t with
+  | K(n) -> 1
+  | Arrow(t1, t2) -> length_type t1 + length_type t2
 
 exception No_inference
 
@@ -248,4 +382,39 @@ and type_check_cont c t_sub =
   | Comp(s1, s2) -> let c_s2 = type_check_cont c s2 in
     type_check_cont c_s2 s1 
 
+(*
+let rec eta_long_normal_form (a : s_term) (c : context) =
+  let ty = type_check_inf c a in
+  match t with
+  | S_Abs (tc, b)  -> S_Abs (tc, eta_long_normal_form b (tc::c))
+  | S_App (t1, t2) ->
+    if is_number t1
+    then (
+      let l = length_type ty -1
+*)
 
+(*
+exception Arf
+
+let rec ln_app_chain (ac : s_term) (c : context) (n : int) =
+  match ac with
+  | S_App (ac, bi) -> (*let ty_bi = type_check_inf c bi in*)
+    let ci = long_normalize (normalize_t_s (S_Tsub (bi, (s_shift_n n)))) c in
+    S_App(ln_app_chain ac c n, ci)
+    (*context are probably false here*)
+  | _ -> ac
+and
+expand_arrow_type (t : ty) (body : s_term) : s_term =
+  match t with
+  | Arrow (K (n), Arrow(t1, t2)) -> S_Abs (K (n), (expand_arrow_type (Arrow (t1, t2)) body))
+  | Arrow (K (n), t1) -> S_Abs (K (n), body)
+  | _ -> raise Arf
+and
+long_normalize (t : s_term) (c : context) : s_term =
+  match t with
+  | S_Abs (ty, t) -> S_Abs (ty, long_normalize t (ty::c))
+  | S_App (k, app_chain) -> let ty = type_check_inf c t in
+    let l_ac = long_normalize app_chain c in(* context maybe false *)
+    l_ac
+   *)
+    
