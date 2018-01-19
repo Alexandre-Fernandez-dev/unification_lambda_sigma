@@ -2,32 +2,37 @@ type name = string
 
 let eq_name n1 n2 = (n1 = n2)
 
+(* types *)
 type ty =
   | K of name
   | Arrow of ty * ty
 
+(* new type generator *)
 let gen_type =
   let v = ref 0 in
   incr v;
-  K(string_of_int !v)
+  K (string_of_int !v)
 
 let rec eq_typ t1 t2 =
   match t1, t2 with
-  | K(n1), K(n2) -> eq_name n1 n2
-  | Arrow(ty11, ty12), Arrow(ty21, ty22) ->
+  | K (n1), K (n2) -> eq_name n1 n2
+  | Arrow (ty11, ty12), Arrow (ty21, ty22) ->
     eq_typ ty11 ty21 && eq_typ ty12 ty22
   | _ -> false
 
+(* typing context *)
 type context = ty list
 
 let get_type_c i c = List.nth c (i-1)
 
+(* lambda terms *)
 type term =
   | Var  of int
   | XVar of name
   | Abs  of ty * term
   | App  of term * term
 
+(* lambda height *)
 let rec height (t : term) (n : int) =
   match t with
   | Var(_) -> n
@@ -42,8 +47,10 @@ let rec lift (t : term) (i : int) =
   | Abs(ty, t) -> Abs(ty, lift t (i+1))
   | App(t1, t2) -> App((lift t1 i), (lift t2 i))
 
+(* lift (up arrow) operation : increments free de brujin indices *)
 let lift_plus (t : term) = lift t 0
 
+(* substitution for beta reduction *)
 let rec subst (a: term) (b: term) (n: int) =
   match a with
   | Var(m) -> if m > n then Var(n-1)
@@ -52,11 +59,13 @@ let rec subst (a: term) (b: term) (n: int) =
   | Abs(ty, t1) -> Abs(ty, subst t1 (lift_plus b) (n+1))
   | App(t1, t2) -> App((subst t1 b n), (subst t2 b n))
 
+(* beta reduction *)
 let beta_red (t: term) =
   match t with
   | App(Abs(ty, a), b) -> subst a b 1
   | _ -> t
 
+(* count free variables *)
 let rec free_var (t : term) (i : int) =
   match t with
   | Var(m) -> if m > i then 1 else 0
@@ -66,6 +75,7 @@ let rec free_var (t : term) (i : int) =
 
 (*------------------------------ lsgima --------------------------------*)
 
+(* lambda sigma substitutions and terms *)
 type s_subst =
   (*| Yvar of name *)
   | Id
@@ -79,12 +89,14 @@ and s_term =
   | S_Abs of ty * s_term
   | S_Tsub of s_term * s_subst
 
+(* n number : One lifted (n-1) times *)
 let rec s_shift_n (n : int) =
   match n with
   | 0 -> Id
   | 1 -> Shift
   | n -> Comp(Shift, s_shift_n (n-1))
 
+(* lambda terms to lambda sigma terms *)
 let rec precooking (l_t : term) (n : int) : s_term =
   match l_t with
   | Var(k) -> S_Tsub (S_One, s_shift_n (k-1)) (* Var k *)
@@ -94,6 +106,7 @@ let rec precooking (l_t : term) (n : int) : s_term =
 
 exception No_unshift
 
+(* for eta : need to reverse shift operation *)
 let rec unshift_s (t : s_term) = (* not sure what i am doing here *)
   match t with
   | S_One          -> raise No_unshift
@@ -115,15 +128,15 @@ let rec is_number t =
   match t with
   | S_One         -> true
   | S_Tsub (t, s) -> if s = Shift
-                     then check_is_number t
+                     then is_number t
                      else if t = S_One
-                          then check_is_shift_n s
+                          then is_shift_n s
                           else false
   | _ -> false
 and is_shift_n s =
   match s with
   | Shift         -> true
-  | Comp (s1, s2) -> (check_is_shift_n s1) && (check_is_shift_n s2)
+  | Comp (s1, s2) -> (is_shift_n s1) && (is_shift_n s2)
   | _ -> false
 
 let add_option_i o1 i =
@@ -152,6 +165,7 @@ and count_shift s =
   | Comp (s1, s2) -> add_option (count_shift s1) (count_shift s2)
   | _ -> None
 
+(* pretty print *)
 let rec print_sigma_term t =
   match t with
   | S_One          -> print_string "1"
@@ -178,7 +192,7 @@ and print_sigma_subst s =
   | Comp (s1, s2)  -> print_sigma_subst s1;
                       print_string "∘"; print_sigma_subst s2
 
-(* -------------------- reduction Hugo-style ------------------ *)
+(* reduction rules *)
 let beta_red_s (t: s_term) =
   match t with
   | S_App (S_Abs (ty, a), b) -> S_Tsub (a, Cons (b, Id))
@@ -331,17 +345,19 @@ let test = S_App (three, S_Tsub (S_App ( four, S_Xvar ("H1") ), Cons (S_One, Id 
 
 let () = print_sigma_term test; print_string "\n"; print_sigma_term (normalise_lambda_sigma test)
 
+(* number of arrow in a type *)
 let rec length_type (t : ty) =
   match t with
   | K(n) -> 1
   | Arrow(t1, t2) -> length_type t1 + length_type t2
+(* FIXME : maybe wrong for getting "toplevel" arrow chain size, cf. number of Ai for long normal form p. 19 dowek1 *)
 
 exception No_inference
 
 let rec type_check_inf c t_term =
   match t_term with
   | S_One -> get_type_c 1 c
-  | S_Xvar(n) -> K(n)               (* TODO : Not really sure about this one, should be an unique type Tx AND an unique context Cx, cf. dowek1 p18*)
+  | S_Xvar(n) -> K(n) (* FIXME : Not really sure about this one, should be an unique type Tx AND an unique context Cx, cf. dowek1 p18*)
   | S_Abs(ty_abs, te_abs) ->
     type_check_inf (ty_abs::c) te_abs
   | S_App(a, b) -> let ty_A = type_check_inf c b in
@@ -353,7 +369,7 @@ let rec type_check_inf c t_term =
     type_check_inf c_s t 
 and type_check_cont c t_sub =
   match t_sub with
-  (*| Yvar(n)      -> *)            (* TODO : Do not remember why this variant was added. Removed for the moment *)
+  (*| Yvar(n)      -> *) (* TODO : Do not remember why this variant was added. Removed for the moment *)
   | Id           -> c
   | Shift        -> (match c with
       | []     -> raise No_inference
@@ -365,4 +381,4 @@ and type_check_cont c t_sub =
     type_check_cont c_s2 s1 
 
 
-(* TODO eta long normal form *)
+(* TODO : eta long normal form *)
