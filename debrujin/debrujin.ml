@@ -331,24 +331,6 @@ let test = S_App (three, S_Tsub (S_App ( four, S_Xvar ("H1") ), Cons (S_One, Id 
 
 let () = print_sigma_term test; print_string "\n"; print_sigma_term (normalise_lambda_sigma test)
 
-(*
-let rec propagate_s (t : s_term) (f : s_subst -> s_subst) = (* not sure what i am doing here maybe need rec*)
-  match t with
-  | S_One          -> S_One
-  | S_Xvar (n)     -> S_Xvar (n)
-  | S_Abs (ty, t)  -> S_Abs (ty, propagate_s t f)
-  | S_App (t1, t2) -> S_App (propagate_s t1 f, propagate_s t2 f)
-  | S_Tsub (t1, s) -> S_Tsub (propagate_s t1 f, (f s))
-
-let rec normalize_t_s (t : s_term) = (* not sure what i am doing here *)
-  let reduced = reduce_term_s t in
-  if reduced = t then
-    let reduced_s = propagate_s t reduce_subst_s in
-    if reduced_s = t
-    then t
-    else normalize_t_s reduced_s
-  else normalize_t_s reduced
-*)
 let rec length_type (t : ty) =
   match t with
   | K(n) -> 1
@@ -382,39 +364,5 @@ and type_check_cont c t_sub =
   | Comp(s1, s2) -> let c_s2 = type_check_cont c s2 in
     type_check_cont c_s2 s1 
 
-(*
-let rec eta_long_normal_form (a : s_term) (c : context) =
-  let ty = type_check_inf c a in
-  match t with
-  | S_Abs (tc, b)  -> S_Abs (tc, eta_long_normal_form b (tc::c))
-  | S_App (t1, t2) ->
-    if is_number t1
-    then (
-      let l = length_type ty -1
-*)
 
-(*
-exception Arf
-
-let rec ln_app_chain (ac : s_term) (c : context) (n : int) =
-  match ac with
-  | S_App (ac, bi) -> (*let ty_bi = type_check_inf c bi in*)
-    let ci = long_normalize (normalize_t_s (S_Tsub (bi, (s_shift_n n)))) c in
-    S_App(ln_app_chain ac c n, ci)
-    (*context are probably false here*)
-  | _ -> ac
-and
-expand_arrow_type (t : ty) (body : s_term) : s_term =
-  match t with
-  | Arrow (K (n), Arrow(t1, t2)) -> S_Abs (K (n), (expand_arrow_type (Arrow (t1, t2)) body))
-  | Arrow (K (n), t1) -> S_Abs (K (n), body)
-  | _ -> raise Arf
-and
-long_normalize (t : s_term) (c : context) : s_term =
-  match t with
-  | S_Abs (ty, t) -> S_Abs (ty, long_normalize t (ty::c))
-  | S_App (k, app_chain) -> let ty = type_check_inf c t in
-    let l_ac = long_normalize app_chain c in(* context maybe false *)
-    l_ac
-   *)
-    
+(* TODO eta long normal form *)
