@@ -1,0 +1,40 @@
+\section{Introduction}
+
+Dans le cadre de l'enseignement de Groupe de Recherche en Algorithmique, il va s'agir dans ce projet, qui s'inscrit dans le développement de l'assistant de preuve LaTTe\footnote{\url{https://github.com/latte-central/latte-checker}} par Frédéric Peschanski, d'implémenter un algorithme d'unification d'ordre supérieur.
+
+\section{$\lambda$-calcul}
+
+\subsection{Le $\lambda$-calcul avec noms}
+
+Soit $V$ un ensemble de variables ($V={x,y,\dots}$). Les termes du $\lambda$-calcul sont définis intuitivement par:
+\[ a ::= x | (a a) | \lambda x. a.\]
+Un terme $\lambda x.a$ représente la fonction qui a $x$ associe $a$ (le corps de la fonction). Si on applique cette fonction à un paramètre $b$, alors on obtient la valeur de $a$ pour laquelle toutes les occurrences de $x$ ont été remplacées par $b$. Ce remplacement peut être écrit de manière formelle de la manière suivante (on parle de $\beta$-réduction):
+\[ (\lambda x .a) b \xrightarrow{}{x \xrightarrow{} b} a. \]
+Avant d’effectuer une $\beta$-réduction, les variables liées qui apparaissent à la fois dans $a$ et dans $b$ doivent se voir subir une $\alpha$-conversion: on renomme ces variables pour $a$ ou $b$.
+
+\paragraph{Définition:}
+Soit $a$ un terme. Soit $FV(a)$ l’ensemble des variables libres de $a$. Pour une évaluation $\theta$ liant les variables $x_1,\dots,x_n$ aux variables $a_1,\dots,a_n$, la substitution qui étend $\theta$ et notée $\bar{\theta}={x_1/a_1,\dots,x_n/a_n}$ est définie par:
+
+\begin{align*}
+&\bar{\theta}x = \theta x \\
+&\bar{\theta}(a \quad b) = (\bar{\theta}a \quad \bar{\theta}b) \\
+& \bar{\theta}(\lambda y.a) = \lambda z (\bar{\theta}{y/z}a) 
+\end{align*}
+où $z$ est une nouvelle variable telle que $\theta z = z$, $z \notin a$ et $\forall{x} \in FV(a)$, et $z \notin FV(\theta x)$.
+
+Il est nécessaire de renommer les variables liés (faire une $\alpha$-conversion) avant d’effectuer une substitution sous un $\lambda$. 
+
+\paragraph{Définition:}
+La $\beta$-réduction est définie par la règle:
+\[(\lambda x.a)b \xrightarrow{} {x/b}a.\]
+La $\eta$-réduction est définie par la règle:
+\[(\lambda x).(a x) \xrightarrow{} a \]
+si $x \notin FV(a)$.
+
+\subsection{Les variables d’unification}
+
+Dans un $\lambda$-terme, on peut distinguer plusieurs types de variables. Le premier type est les variables liées qui ne sont pas concernées par les substitutions de l’unification. Le second est les variables libres qui peuvent être séparées en deux classes:
+\begin{itemize}
+    \item les constantes qui ne peuvent pas être substituées pendant l’unification
+    \item les vraies variables d’unification qui définissent le problème d’unification
+\end{itemize}
