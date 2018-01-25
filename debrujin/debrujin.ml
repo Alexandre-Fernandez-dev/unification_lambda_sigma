@@ -381,4 +381,27 @@ and type_check_cont c t_sub =
     type_check_cont c_s2 s1 
 
 
-(* TODO : eta long normal form *)
+(* eta long normal form *)
+(* auxialiary function to get the last type before the returning type of a type *)
+(* the first element of the returning pair is the type you wan't and the second is the type without the result that you get *) 
+let rec get_last_type_before_ret_rec (typ : ty) : (ty*ty) =
+  match typ with
+  | K n -> failwith "TODO make a good comment to say it's not possible :p"
+  | Arrow (ty1,K n) -> (ty1, K n)
+  | Arrow (ty1,ty2) -> let (ret1,ret2) =  get_last_type_before_ret_rec ty2 in
+                       (ret1,Arrow (ty1,ret2))
+                       
+(* dans cette fonction on considère que l'on appel avec un terme qui à est déja sous normale forme 
+c'est pour ça par exemple quand dans le cas de S_Tsub on ne traite que le cas où le terme de gauche est une variable existentielle *)
+let rec eta_long_normal_form (t : s_term) (typ : ty): s_term =
+  match t with
+  | S_One | S_Xvar _ -> t
+  | S_App (t1,t2) -> let (ty,rest) = 
+
+                       S_Abs()
+  | S_Abs (ty1,t1) -> S_Abs(ty1,eta_long_normal_form t1)
+  | S_Tsub (t1,s1) -> (match t1 with
+                       | S_Xvar n -> failwith "celle la on vas la faire"
+                       | _ -> failwith "eta_long_normal_form can't happend")
+                        
+                                       
