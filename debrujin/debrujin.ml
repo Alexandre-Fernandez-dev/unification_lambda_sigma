@@ -384,11 +384,11 @@ and type_check_cont c t_sub =
 (* eta long normal form *)
 (* auxialiary function to get the last type before the returning type of a type *)
 (* the first element of the returning pair is the type you wan't and the second is the type without the result that you get *) 
-let rec get_last_type_before_ret_rec (typ : ty) : (ty*ty) =
+let rec get_before_last_type (typ : ty) : (ty*ty) =
   match typ with
   | K n -> failwith "TODO make a good comment to say it's not possible :p"
   | Arrow (ty1,K n) -> (ty1, K n)
-  | Arrow (ty1,ty2) -> let (ret1,ret2) =  get_last_type_before_ret_rec ty2 in
+  | Arrow (ty1,ty2) -> let (ret1,ret2) =  get_before_last_type ty2 in
                        (ret1,Arrow (ty1,ret2))
                        
 (* dans cette fonction on considère que l'on appel avec un terme qui à est déja sous normale forme 
@@ -396,10 +396,16 @@ c'est pour ça par exemple quand dans le cas de S_Tsub on ne traite que le cas o
 let rec eta_long_normal_form (t : s_term) (typ : ty): s_term =
   match t with
   | S_One | S_Xvar _ -> t
-  | S_App (t1,t2) -> let (ty,rest) = 
-
-                       S_Abs()
-  | S_Abs (ty1,t1) -> S_Abs(ty1,eta_long_normal_form t1)
+  | S_App (t1,t2) -> let (ty,rest) = get_before_last_type typ in
+                     let left = (match t1 with
+                       | S_One -> S_Tsub (S_One,(s_shift_n 2))
+                       | S_Tsub(S_One,s1) -> S_Tsub(S_One,Comp(Shift,s1))
+                       | S_Tsub(S_Xvar n,s1) -> failwith "aussi"
+                       | _ -> failwith "eta_long_normal_form can't happend you should be in normal form") in
+                     let right = eta_long_normal_form (normalise_lambda_sigma (S_Tsub(t2,(s_shift_n 1)))) rest in 
+                     S_Abs(left,right)
+  | S_Abs (ty1,t1) ->
+     S_Abs(ty1,eta_long_normal_form t1 )
   | S_Tsub (t1,s1) -> (match t1 with
                        | S_Xvar n -> failwith "celle la on vas la faire"
                        | _ -> failwith "eta_long_normal_form can't happend")
