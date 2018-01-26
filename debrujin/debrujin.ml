@@ -419,3 +419,7 @@ let rec eta_long_normal_form (t : s_term) (typ : ty) (m_c : meta_var_str) : s_te
      S_Abs(ty1,eta_long_normal_form t1 typ m_c)
                         
                                        
+          (*--------------------------------- Unification ------------------------------*)
+
+
+          
