@@ -354,31 +354,34 @@ let rec length_type (t : ty) =
 
 exception No_inference
 
-let rec type_check_inf c t_term =
+module Map_str = Map.Make (String)
+type meta_var_str = ty Map_str.t
+                       
+let rec type_check_inf c t_term (m_c : meta_var_str) =
   match t_term with
   | S_One -> get_type_c 1 c
-  | S_Xvar(n) -> K(n) (* FIXME : Not really sure about this one, should be an unique type Tx AND an unique context Cx, cf. dowek1 p18*)
+  | S_Xvar(n) -> Map_str.find n m_c  (* FIXME : Not really sure about this one, should be an unique type Tx AND an unique context Cx, cf. dowek1 p18*)
   | S_Abs(ty_abs, te_abs) ->
-    type_check_inf (ty_abs::c) te_abs
-  | S_App(a, b) -> let ty_A = type_check_inf c b in
-    let ty_arr = type_check_inf c a in
+    type_check_inf (ty_abs::c) te_abs m_c
+  | S_App(a, b) -> let ty_A = type_check_inf c b m_c in
+    let ty_arr = type_check_inf c a m_c in
     (match ty_arr with
      | Arrow(ty_A2, ty_B) -> if eq_typ ty_A ty_A2 then ty_B else raise No_inference
      | _ -> raise No_inference)
-  | S_Tsub(t, s) -> let c_s = type_check_cont c s in
-    type_check_inf c_s t 
-and type_check_cont c t_sub =
+  | S_Tsub(t, s) -> let c_s = type_check_cont c s m_c in
+    type_check_inf c_s t m_c 
+and type_check_cont c t_sub m_c =
   match t_sub with
   (*| Yvar(n)      -> *) (* TODO : Do not remember why this variant was added. Removed for the moment *)
   | Id           -> c
   | Shift        -> (match c with
       | []     -> raise No_inference
       | hd::tl -> tl)
-  | Cons(t, s)   -> let c_s = type_check_cont c s in
-    let ty_t = type_check_inf c t in
+  | Cons(t, s)   -> let c_s = type_check_cont c s m_c in
+    let ty_t = type_check_inf c t m_c in
     ty_t::c_s
-  | Comp(s1, s2) -> let c_s2 = type_check_cont c s2 in
-    type_check_cont c_s2 s1 
+  | Comp(s1, s2) -> let c_s2 = type_check_cont c s2 m_c in
+    type_check_cont c_s2 s1 m_c 
 
 
 (* eta long normal form *)
@@ -399,19 +402,20 @@ let rec apply_fun_subst (s : s_subst) (f : s_term -> s_term) : s_subst =
                         
 (* dans cette fonction on considère que l'on appel avec un terme qui à est déja sous normale forme 
 c'est pour ça par exemple quand dans le cas de S_Tsub on ne traite que le cas où le terme de gauche est une variable existentielle *)
-let rec eta_long_normal_form (t : s_term) (typ : ty) : s_term =
+let rec eta_long_normal_form (t : s_term) (typ : ty) (m_c : meta_var_str) : s_term =
   match t with
   | S_One | S_Xvar _ | S_Tsub (_,_) -> t
   | S_App (t1,t2) -> let (ty,rest) = get_before_last_type typ in
                      let left = (match t1 with
                        | S_One -> S_Tsub (S_One,(s_shift_n 2))
                        | S_Tsub(S_One,s1) -> S_Tsub(S_One,Comp(Shift,s1))
-                       | S_Tsub(S_Xvar n,s1) -> let s_prime = apply_fun_subst s1 (fun t -> eta_long_normal_form t ty) (* here the type given is maybe 
-false il faut surement le retrouver depuis le contexte des variables d'unifications *) in S_Tsub(S_Xvar n,s_prime)
+                       | S_Tsub(S_Xvar n,s1) ->
+                          let meta_type = Map_str.find n m_c in 
+                          let s_prime = apply_fun_subst s1 (fun t -> eta_long_normal_form t meta_type m_c) in S_Tsub(S_Xvar n,s_prime)
                        | _ -> failwith "eta_long_normal_form can't happend you should be in normal form") in
-                     let right = eta_long_normal_form (normalise_lambda_sigma (S_Tsub(t2,(s_shift_n 1)))) rest in 
+                     let right = eta_long_normal_form (normalise_lambda_sigma (S_Tsub(t2,(s_shift_n 1)))) rest m_c in 
                      S_Abs(ty,S_App(left,right))
   | S_Abs (ty1,t1) ->
-     S_Abs(ty1,eta_long_normal_form t1 typ)
+     S_Abs(ty1,eta_long_normal_form t1 typ m_c)
                         
                                        
