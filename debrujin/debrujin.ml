@@ -66,6 +66,11 @@ let rec free_var (t : term) (i : int) =
   | Abs(ty, t1) -> free_var t1 (i+1)
   | App(t1, t2) -> (free_var t1 i) + (free_var t2 i)
 
+let left_beta_red (t:term) =
+  match t with
+  | App(a, b) -> App((beta_red a), b)
+  | _ -> t
+
 (*------------------------------ lsgima --------------------------------*)
 
 type s_subst =
@@ -98,9 +103,15 @@ let rec precooking (l_t : term) (n : int) : s_term =
 
 (* -------------------- reduction Hugo-style ------------------ *)
 
-let sbeta_red (t: s_term) =
+let s_beta_red (t: s_term) =
   match t with
   | S_App (S_Abs(ty, a), b) -> S_Tsub(a, Cons(b, Id)) 
+  | _ -> t
+
+let rec left_s_beta_red (t: s_term) =
+  match t with
+  | S_App(S_App (S_Abs(ty, a), b), c) -> S_App((s_beta_red (S_App (S_Abs(ty, a), b))), b)
+  | S_App(a, b) -> S_App(left_s_beta_red a, b)
   | _ -> t
 
 let app_red (t: s_term) =
@@ -163,6 +174,25 @@ let scons_red (s: s_subst) =
   | Cons(S_Tsub(S_One, s1), Comp(Shift, s2)) -> if s1 = s2 then s1 else s
   | _ -> s
 
+let s_sub_red (t: s_term) =
+  match t with
+  | S_Tsub (S_App(_,_), _) -> app_red t
+  | S_Tsub (S_One, Cons(_,_)) -> varcons_red t
+  | S_Tsub (_, Id) -> id_red t
+  | S_Tsub (S_Abs(_, _), _) -> abs_red t
+  | S_Tsub(S_Tsub(_,_),_) -> clos_red t
+  | _ -> t
+
+let rec left_s_sub_red (t:s_term) =
+  match t with
+  | S_App(S_Tsub (S_App(_,_), _), b) -> S_App(app_red t, b)
+  | S_App(S_Tsub (S_One, Cons(_,_)), b) -> S_App(varcons_red t, b)
+  | S_App(S_Tsub (_, Id), b) -> S_App(id_red t, b)
+  | S_App(S_Tsub (S_Abs(_, _), _), b) -> S_App(abs_red t, b)
+  | S_App(S_Tsub(S_Tsub(_,_),_), b) -> S_App(clos_red t, b)
+  | S_App(a, b) -> S_App(left_s_sub_red a, b)
+  | _ -> t
+
 exception No_inference
 
 let rec type_check_inf c t_term =
@@ -198,38 +228,42 @@ let print_bool b =
   print_string(string_of_bool b^"\n")
 ;;
 
-let rec print_term (t: term) =
+let rec term_to_string (t: term) =
   match t with
   | Var n  -> "Var("^string_of_int n^")"
   | XVar n -> "XVar("^n^")"
-  | Abs (ty, t1) -> "Abs("^print_term t1^")"
-  | App  (t1, t2) -> "App("^print_term t1^", "^print_term t2^")"
+  | Abs (ty, t1) -> "Abs("^term_to_string t1^")"
+  | App  (t1, t2) -> "App("^term_to_string t1^", "^term_to_string t2^")"
 
-let rec print_s_term (s: s_term) = 
+let rec sterm_to_string (s: s_term) = 
   match s with
   | S_One -> "S_One"
   | S_Xvar n -> "S_Xvar("^n^")"
-  | S_App (s1, s2)-> "S_App("^print_s_term s1^", "^print_s_term s2^")"
-  | S_Abs (ty, t) -> "S_Abs("^print_s_term t^")"
-  | S_Tsub (t, s) -> "S_Tsub("^print_s_term t^", "^print_s_subst s^")"
-and print_s_subst (s: s_subst) =
+  | S_App (s1, s2)-> "S_App("^sterm_to_string s1^", "^sterm_to_string s2^")"
+  | S_Abs (ty, t) -> "S_Abs("^sterm_to_string t^")"
+  | S_Tsub (t, s) -> "S_Tsub("^sterm_to_string t^", "^ssubst_to_string s^")"
+and ssubst_to_string (s: s_subst) =
   match s with
   | Id -> "id"
   | Shift -> "↑"
-  | Cons (t, s) -> "Cons("^print_s_term t^", "^print_s_subst s^")"
-  | Comp (s1, s2) -> "Comp("^print_s_subst s1^", "^print_s_subst s2^")"
+  | Cons (t, s) -> "Cons("^sterm_to_string t^", "^ssubst_to_string s^")"
+  | Comp (s1, s2) -> "Comp("^ssubst_to_string s1^", "^ssubst_to_string s2^")"
+
+let println (s:string) =
+  print_string (s^"\n");
+;;
 
 let test_reduction (t: term) (r: term) =
-  print_string ("TEST: "^print_term t);
-  print_string (" -> "^print_term r^" : ");
+  print_string ("TEST: "^term_to_string t);
+  print_string (" -> "^term_to_string r^" : ");
   print_bool (t=r);
   print_newline
 ;;
 
 
 let test_Sreduction (t: s_term) (r: s_term) =
-  print_string ("TEST "^print_s_term t);
-  print_string (" -> "^print_s_term r^" : ");
+  print_string ("TEST "^sterm_to_string t);
+  print_string (" -> "^sterm_to_string r^" : ");
   print_bool (t=r);
   print_newline
 ;;
@@ -238,17 +272,77 @@ let test_Sreduction (t: s_term) (r: s_term) =
 
 (* Lambda *)
 let l1 = App(
-          Abs(K "t", Var(1)), 
+          Abs(
+            K "t", 
+            Var(1)), 
           Var(42)
         );;
 
 let l2 = App(
-          Abs(K "t", Var(1)),
+          Abs(
+            K "t", 
+            Var(1)
+          ),
           App(
             Abs(K "t", Var(1)),
             Var(2)
           )
         );;
+
+let l3 = App(
+          App(
+            Abs(
+              K "t",
+              App(
+                Abs(
+                  K "t",
+                  Var(1)
+                ),
+                Var(1)
+              )
+            ),
+            Var(1)
+          ),
+          XVar "z"
+        );;
+
+(* Sigma *)
+
+let s1 = S_App(
+          S_Abs(
+            K "t", 
+            S_One),
+          S_Xvar "42"
+        );;
+
+let s2 = S_App(
+          S_Abs(
+            K "t", 
+            S_One),
+          S_App(
+            S_Abs(
+              K "t", 
+              S_One),
+            S_Xvar("2")
+          )
+        );;
+
+let s3 = S_App(
+          S_App(
+            S_Abs(
+              K "t",
+              S_App(
+                S_Abs(
+                  K "t",
+                  S_One
+                ),
+                S_One
+              )
+            ),
+            S_One
+          ),
+          S_Xvar "z"
+        );; 
 
 
 (*-------------------- Testing values : all of them should be true --------------------*)
@@ -256,5 +350,11 @@ let l2 = App(
 
 test_reduction (beta_red l1) (Var(42));;
 test_reduction (beta_red (beta_red l2)) (Var(2));;
+(* test_reduction (beta_red l3) (App(XVar("z"), XVar("y")));; *)
 
 (* test_Sreduction s1 s1;; *)
+
+test_Sreduction (s_sub_red(s_beta_red s1)) (S_Xvar "42");;
+test_Sreduction (s_sub_red(s_beta_red(s_sub_red(s_beta_red s2)))) (S_Xvar "2");;
+
+println (sterm_to_string (left_s_sub_red(left_s_sub_red(left_s_beta_red s3))));;
