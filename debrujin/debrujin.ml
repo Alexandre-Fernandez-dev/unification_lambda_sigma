@@ -390,24 +390,28 @@ let rec get_before_last_type (typ : ty) : (ty*ty) =
   | Arrow (ty1,K n) -> (ty1, K n)
   | Arrow (ty1,ty2) -> let (ret1,ret2) =  get_before_last_type ty2 in
                        (ret1,Arrow (ty1,ret2))
-                       
+
+let rec apply_fun_subst (s : s_subst) (f : s_term -> s_term) : s_subst =
+  match s with
+  | Id | Shift -> s
+  | Cons (t,s1) -> Cons (f t, apply_fun_subst s f) 
+  | Comp (s1,s2) -> Comp(apply_fun_subst s1 f,apply_fun_subst s2 f)
+                        
 (* dans cette fonction on considère que l'on appel avec un terme qui à est déja sous normale forme 
 c'est pour ça par exemple quand dans le cas de S_Tsub on ne traite que le cas où le terme de gauche est une variable existentielle *)
-let rec eta_long_normal_form (t : s_term) (typ : ty): s_term =
+let rec eta_long_normal_form (t : s_term) (typ : ty) : s_term =
   match t with
-  | S_One | S_Xvar _ -> t
+  | S_One | S_Xvar _ | S_Tsub (_,_) -> t
   | S_App (t1,t2) -> let (ty,rest) = get_before_last_type typ in
                      let left = (match t1 with
                        | S_One -> S_Tsub (S_One,(s_shift_n 2))
                        | S_Tsub(S_One,s1) -> S_Tsub(S_One,Comp(Shift,s1))
-                       | S_Tsub(S_Xvar n,s1) -> failwith "aussi"
+                       | S_Tsub(S_Xvar n,s1) -> let s_prime = apply_fun_subst s1 (fun t -> eta_long_normal_form t ty) (* here the type given is maybe 
+false il faut surement le retrouver depuis le contexte des variables d'unifications *) in S_Tsub(S_Xvar n,s_prime)
                        | _ -> failwith "eta_long_normal_form can't happend you should be in normal form") in
                      let right = eta_long_normal_form (normalise_lambda_sigma (S_Tsub(t2,(s_shift_n 1)))) rest in 
-                     S_Abs(left,right)
+                     S_Abs(ty,S_App(left,right))
   | S_Abs (ty1,t1) ->
-     S_Abs(ty1,eta_long_normal_form t1 )
-  | S_Tsub (t1,s1) -> (match t1 with
-                       | S_Xvar n -> failwith "celle la on vas la faire"
-                       | _ -> failwith "eta_long_normal_form can't happend")
+     S_Abs(ty1,eta_long_normal_form t1 typ)
                         
                                        
