@@ -355,12 +355,12 @@ let rec length_type (t : ty) =
 exception No_inference
 
 module Map_str = Map.Make (String)
-type meta_var_str = ty Map_str.t
+type meta_var_str = (ty * bool) Map_str.t
                        
-let rec type_check_inf c t_term (m_c : meta_var_str) =
+let rec type_check_inf (c: context)  t_term (m_c : meta_var_str) =
   match t_term with
   | S_One -> get_type_c 1 c
-  | S_Xvar(n) -> Map_str.find n m_c  (* FIXME : Not really sure about this one, should be an unique type Tx AND an unique context Cx, cf. dowek1 p18*)
+  | S_Xvar(n) -> fst (Map_str.find n m_c)  (* FIXME : Not really sure about this one, should be an unique type Tx AND an unique context Cx, cf. dowek1 p18*)
   | S_Abs(ty_abs, te_abs) ->
     type_check_inf (ty_abs::c) te_abs m_c
   | S_App(a, b) -> let ty_A = type_check_inf c b m_c in
@@ -410,7 +410,7 @@ let rec eta_long_normal_form (t : s_term) (typ : ty) (m_c : meta_var_str) : s_te
                        | S_One -> S_Tsub (S_One,(s_shift_n 2))
                        | S_Tsub(S_One,s1) -> S_Tsub(S_One,Comp(Shift,s1))
                        | S_Tsub(S_Xvar n,s1) ->
-                          let meta_type = Map_str.find n m_c in 
+                          let meta_type = fst (Map_str.find n m_c) in 
                           let s_prime = apply_fun_subst s1 (fun t -> eta_long_normal_form t meta_type m_c) in S_Tsub(S_Xvar n,s_prime)
                        | _ -> failwith "eta_long_normal_form can't happend you should be in normal form") in
                      let right = eta_long_normal_form (normalise_lambda_sigma (S_Tsub(t2,(s_shift_n 1)))) rest m_c in 
@@ -419,7 +419,41 @@ let rec eta_long_normal_form (t : s_term) (typ : ty) (m_c : meta_var_str) : s_te
      S_Abs(ty1,eta_long_normal_form t1 typ m_c)
                         
                                        
-          (*--------------------------------- Unification ------------------------------*)
+(*--------------------------------- Unification ------------------------------*)
 
+type equa = s_term * s_term
 
+type and_list = equa list
+
+type unif_rules_ret =
+  | Ret of and_list
+  | Rep of name * s_term
+  | Fail
+
+let unif_rules (e: equa) (ctx: meta_var_str) : unif_rules_ret =
+  match e with
+  | (S_Abs (typ1, t1), S_Abs (typ2, t2)) -> if eq_typ typ1 typ2 then Ret ([(t1, t2)]) else Fail
+  | (S_App (t1, t2), S_App (t3, t4)) ->(
+    match t1, t2 with
+    | S_Tsub (S_One, s1), S_Tsub(S_One, s2) -> if s1 = s2 then Ret ([t2, t4])
+                                           else Fail
+    | _ -> failwith "todo later")
+  | S_Xvar (n), t -> Rep (n, t)
+  | _ -> let arrow_metavars =
+           Map_str.filter(fun k tb -> match tb with
+                                | Arrow (_,_), true -> true 
+                                | _ -> false) ctx in
+         if Map_str.cardinal arrow_metavars != 0
+         then 
+            let v = min_binding arrow_metavars in
+
+         else
+            Ret ([e])
           
+let rec unif_small_step (s: and_list) : and_list =
+  match s with
+  | []      -> []
+  | e :: tl -> match unif_rules e with
+                | None -> e :: unif_small_step tl
+                | Some me -> me @ unif_small_step tl
+
