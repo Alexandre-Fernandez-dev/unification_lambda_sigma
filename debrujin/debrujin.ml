@@ -89,6 +89,11 @@ and s_term =
   | S_Abs of ty * s_term
   | S_Tsub of s_term * s_subst
 
+let gen_new_XVar () =
+  let truc = ref 0 in
+  incr truc;
+  "X" ^ (string_of_int !truc)
+
 (* n number : One lifted (n-1) times *)
 let rec s_shift_n (n : int) =
   match n with
@@ -421,34 +426,46 @@ let rec eta_long_normal_form (t : s_term) (typ : ty) (m_c : meta_var_str) : s_te
                                        
 (*--------------------------------- Unification ------------------------------*)
 
-type equa = s_term * s_term
+type equa = 
+  | DecEq of s_term * s_term
+  | Exp
 
 type and_list = equa list
 
 type unif_rules_ret =
-  | Ret of and_list
-  | Rep of name * s_term
+  | Ret of and_list * meta_var_str
+  | Rep of name * s_term * and_list
+  | Nope
   | Fail
 
 let unif_rules (e: equa) (ctx: meta_var_str) : unif_rules_ret =
   match e with
-  | (S_Abs (typ1, t1), S_Abs (typ2, t2)) -> if eq_typ typ1 typ2 then Ret ([(t1, t2)]) else Fail
-  | (S_App (t1, t2), S_App (t3, t4)) ->(
-    match t1, t2 with
-    | S_Tsub (S_One, s1), S_Tsub(S_One, s2) -> if s1 = s2 then Ret ([t2, t4])
-                                           else Fail
-    | _ -> failwith "todo later")
-  | S_Xvar (n), t -> Rep (n, t)
-  | _ -> let arrow_metavars =
-           Map_str.filter(fun k tb -> match tb with
-                                | Arrow (_,_), true -> true 
+  (* DEC LAM *)
+  | DecEq (S_Abs (typ1, t1), S_Abs (typ2, t2)) -> if eq_typ typ1 typ2 then Ret ([ DecEq (t1, t2)], ctx) else Fail
+  (* DEC APP *)
+  | DecEq (S_App (t1, t2), S_App (t3, t4)) ->
+      if t1 = t3 then Ret ([DecEq (t2, t4)], ctx)
+      else Fail
+  (* REP *)
+  | DecEq (S_Xvar (n), t) -> Rep (n, t, [e])
+  (* EXP APP *)
+(*  | DecEq (S_Tsub (S_Xvar(x), s), S_App (m, b)) ->*)
+  (* EXP LAM*)
+  | Exp -> let arrow_metavars =
+            Map_str.filter(fun k tb -> match tb with
+                                | Arrow (_,_), false -> true 
                                 | _ -> false) ctx in
          if Map_str.cardinal arrow_metavars != 0
          then 
-            let v = min_binding arrow_metavars in
-
+            let (x, (typ, _)) = Map_str.min_binding arrow_metavars in
+            let first_ty, rest_ty = (match typ with
+              | Arrow (a, b) -> a, b
+              | _ -> failwith "impossible") in 
+            let name_y = gen_new_XVar() in
+            let new_ctx = Map_str.add name_y (rest_ty, false) ctx in
+            Ret ([DecEq(S_Xvar(x), S_Abs(first_ty, S_Xvar(name_y)))], new_ctx)
          else
-            Ret ([e])
+            Nope
           
 let rec unif_small_step (s: and_list) : and_list =
   match s with
