@@ -424,7 +424,25 @@ let rec eta_long_normal_form (t : s_term) (typ : ty) (m_c : meta_var_str) : s_te
      S_Abs(ty1,eta_long_normal_form t1 typ m_c)
                         
                                        
+
 (*--------------------------------- Unification ------------------------------*)
+(* Cette retourne les variables dont le type est soit un type atomique égal a ty ou un type flèche qui termine par un type égal à ty*)
+let rec get_last_type (typ : ty) = 
+  match typ with 
+  | K(n) -> typ
+  | Arrow (t1,t2) -> get_last_type t2
+
+let rec find_var_end_typ_rec (cx : context) (typ : ty) (acc : int) : (ty * int) list =
+  match cx with
+  | t :: tl -> let last_typ = get_last_type t in
+    if eq_typ last_typ typ then
+      (t, acc) :: find_var_end_typ_rec tl typ (acc + 1)
+    else
+      find_var_end_typ_rec tl typ (acc + 1)
+  | [] -> []
+
+let find_var_end_typ (cx : context) (typ : ty) : (ty * int) list =
+  find_var_end_typ_rec cx typ 1
 
 type equa = 
   | DecEq of s_term * s_term
@@ -433,23 +451,52 @@ type equa =
 type and_list = equa list
 
 type unif_rules_ret =
-  | Ret of and_list * meta_var_str
+  | Ret of (and_list * meta_var_str) list
   | Rep of name * s_term * and_list
   | Nope
   | Fail
 
-let unif_rules (e: equa) (ctx: meta_var_str) : unif_rules_ret =
+let rec get_type_without_end (typ : ty) =
+  match typ with
+  | K(x) -> failwith "impossible get type without end"
+  | Arrow (a, K(n)) -> a
+  | Arrow (a, b) -> Arrow(a, get_type_without_end b)
+
+                    
+                    
+                    
+let rec create_disjunctions (xvar : s_term) (ct : context) (ctx: meta_var_str) (l : (ty * int) list) : unif_rules_ret =
+match l with
+| [] -> Nope
+| (t, i) :: tl -> let (new_ctx, ter) = 
+                    (match t with
+                    | K(n) -> (ctx, S_Tsub (S_One, s_shift_n i))
+                    | Arrow (t1, t2) -> let new_name = gen_new_XVar() in
+                                        let new_xvar = S_Xvar (new_name) in
+                                        let new_ty = get_type_without_end t in
+                                        let new_ctx = Map_str.add new_name (new_ty, false) ctx in
+                                        (new_ctx, S_App (S_Tsub (S_One, s_shift_n i), new_xvar) ) ) in
+                    let new_equa = DecEq (xvar, ter) in
+                    Ret(([new_equa], new_ctx) :: (match create_disjunctions xvar ct ctx tl with
+                                                    | Ret res -> res
+                                                    | _ -> []))
+                                          
+
+let unif_rules (e: equa) (ct : context) (ctx: meta_var_str) : unif_rules_ret =
   match e with
   (* DEC LAM *)
-  | DecEq (S_Abs (typ1, t1), S_Abs (typ2, t2)) -> if eq_typ typ1 typ2 then Ret ([ DecEq (t1, t2)], ctx) else Fail
+  | DecEq (S_Abs (typ1, t1), S_Abs (typ2, t2)) -> if eq_typ typ1 typ2 then Ret [([ DecEq (t1, t2)], ctx)] else Fail
   (* DEC APP *)
   | DecEq (S_App (t1, t2), S_App (t3, t4)) ->
-      if t1 = t3 then Ret ([DecEq (t2, t4)], ctx)
+    if t1 = t3 then Ret [([DecEq (t2, t4)], ctx)]
       else Fail
   (* REP *)
   | DecEq (S_Xvar (n), t) -> Rep (n, t, [e])
   (* EXP APP *)
-(*  | DecEq (S_Tsub (S_Xvar(x), s), S_App (m, b)) ->*)
+  | DecEq (S_Tsub (S_Xvar(x), s), t) ->
+    let (typ, _) = Map_str.find x ctx in
+    let lst = find_var_end_typ ct typ in
+    create_disjunctions (S_Xvar (x)) ct ctx lst
   (* EXP LAM*)
   | Exp -> let arrow_metavars =
             Map_str.filter(fun k tb -> match tb with
@@ -463,14 +510,24 @@ let unif_rules (e: equa) (ctx: meta_var_str) : unif_rules_ret =
               | _ -> failwith "impossible") in 
             let name_y = gen_new_XVar() in
             let new_ctx = Map_str.add name_y (rest_ty, false) ctx in
-            Ret ([DecEq(S_Xvar(x), S_Abs(first_ty, S_Xvar(name_y)))], new_ctx)
+            Ret [([DecEq(S_Xvar(x), S_Abs(first_ty, S_Xvar(name_y)))], new_ctx)]
          else
             Nope
-          
-let rec unif_small_step (s: and_list) : and_list =
-  match s with
-  | []      -> []
-  | e :: tl -> match unif_rules e with
-                | None -> e :: unif_small_step tl
-                | Some me -> me @ unif_small_step tl
+ | _ -> Nope
 
+type unif_ret =
+  | FullNope
+  | Failed
+  | OneRet
+
+
+let rec look_res_list (su : unif_rules_ret list) : unif_ret
+  match su with
+    | Fail :: tl -> Failed
+    | Ret _ :: tl -> OneRet
+    | (*****)
+
+let rec unification_rec (s: and_list) (su : unif_rules_ret list) (ctx : meta_var_str) (ct : context) : and_list =
+  match s with
+  | [] -> 
+  
