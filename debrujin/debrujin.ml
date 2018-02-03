@@ -521,13 +521,31 @@ type unif_ret =
   | OneRet
 
 
-let rec look_res_list (su : unif_rules_ret list) : unif_ret
+let rec look_res_list (su : (and_list * unif_rules_ret list)) : unif_ret =
   match su with
-    | Fail :: tl -> Failed
-    | Ret _ :: tl -> OneRet
-    | (*****)
+    | _,Fail :: tl -> Failed
+    | _,Ret _ :: tl -> OneRet
+    | _ -> failwith "lol"
 
-let rec unification_rec (s: and_list) (su : unif_rules_ret list) (ctx : meta_var_str) (ct : context) : and_list =
+(* su will be a list to store the results of the pasts call of the unification function *)
+(* we should have use array instead of list to represent the and_list cause now we are obligated to keep it 
+ *)
+(* enfaite dans su dès que on a eu un résultat on stocke la and list resulstante pour faire d'une pierre de coup *)
+(* la question c'est esque on vas garder les replaces dans les résultats *)
+
+
+(* pour savoir si c'est finis il suffit de regarder si toutes les variables dans le meta_var_str sont a true *)
+let rec is_that_finished (ctx : meta_var_str) : bool =
+  not (Map_str.exists (fun k (t,b) -> b = false) ctx)
+  
+                    
+let rec unification_rec (s: and_list) (su : (and_list * unif_rules_ret list)) (ctx : meta_var_str) (ct : context) : (and_list * meta_var_str) option =
+  if is_that_finished ctx then Some (s,ctx)
+  else 
   match s with
-  | [] -> 
+  | [] -> (match look_res_list su with
+          | FullNope -> failwith "c'est le cas ou l'on doit appeler la fonction avec le Exp"
+          | OneRet -> unification_rec (fst su) ([],[]) ctx ct
+          | Failed -> None)
+  | _ -> failwith "lol"
   
