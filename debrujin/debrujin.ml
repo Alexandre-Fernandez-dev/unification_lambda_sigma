@@ -539,8 +539,10 @@ let rec is_that_finished (ctx : meta_var_str) : bool =
   not (Map_str.exists (fun k (t,b) -> b = false) ctx)
 
 (* il faudra que cette fonction mette à true la variable qui est bonne *)
-let rec put_metaVar_true (n : name) (t : s_term) (ctx : meta_var_str) : meta_var_str =
-  failwith "todo later"
+let rec put_metaVar_true (n : name) (ctx : meta_var_str) : meta_var_str =
+  let (t,_) = Map_str.find n ctx in
+  let new_ctx = Map_str.remove n ctx in
+  Map_str.add n (t,true) new_ctx 
 
 let rec replace_and_list (n : name) (t : s_term) (s : and_list) : and_list =
   failwith "todo later"
@@ -559,7 +561,7 @@ let rec unification_rec (s: and_list) (su : (and_list * unif_rules_ret list))
                              | Ret l -> start_unification_list l
                              | Rep (res_name,res_term,res_s) -> unification_rec (replace_and_list res_name res_term (old_liste @ res_s)) 
                                                                                    ([],[])
-                                                                                (put_metaVar_true res_name res_term ctx)
+                                                                                (put_metaVar_true res_name ctx)
                                                                                 ct 
                              | Nope -> failwith "maybe we need to stop i don't know need to think about"  
                              | Fail -> None)                           
