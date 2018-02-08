@@ -615,20 +615,47 @@ let rec al_mv_l_to_al (l : ((and_list * meta_var_str) list)) : and_list list =
   | [] -> []
   | (a,b) :: tl -> a :: al_mv_l_to_al tl
       
-let unification (s: and_list) (ctx : meta_var_str) (ct : context) : (meta_var_str list) option =
+let unification (s: and_list) (ctx : meta_var_str) (ct : context) : (meta_var_str list*(and_list list)) option =
   match unification_rec s ([],[]) ctx ct with
   | None -> None
-  | Some res -> Some (al_mv_l_to_mvl res)
+  | Some res -> Some (al_mv_l_to_mvl res,(al_mv_l_to_al res))
 
+let rec pretty_print_list (l : 'a list) (p : 'a -> unit) =
+  match l with
+  | [] -> ()
+  | e :: tl -> p e; pretty_print_list tl p
+  
+                     
 let rec and_list_pretty_print (l : and_list) =
   match l with
   | [] -> ()
   | DecEq (s1,s2) :: tl-> print_sigma_term s1; print_string " = " ;print_sigma_term s2 ;print_string "\n";and_list_pretty_print tl
   | Exp :: tl-> print_string "Exp";and_list_pretty_print tl
       
-      
+(*   | S_One
+  | S_Xvar of name
+  | S_App of s_term * s_term
+  | S_Abs of ty * s_term
+  | S_Tsub of s_term * s_subst
 
-let () = Printf.printf "\nStarting unification tests \n" 
+type ty =
+  | K of name
+  | Arrow of ty * ty
+                                                         
+S_App (three, S_Tsub (S_App ( four, S_Xvar ("H1") ), Cons (S_One, Id ) ) )
+let two = S_Tsub (S_One, Shift)                                                         *)
+let () = Printf.printf "\nStarting unification tests \n"
+let test1_equa = [DecEq(S_Xvar "X", S_Abs(K "int",S_One))]
+let test1_ctx = Map_str.add "X" (Arrow(K "int",K "int"),false) Map_str.empty
+let test1_ct = []
+let run_test1 = unification test1_equa test1_ctx test1_ct
+let () =
+  match run_test1 with
+  | Some (a,b) -> pretty_print_list b and_list_pretty_print
+  | None -> ()
+                      
+
+                       
     
     
       
