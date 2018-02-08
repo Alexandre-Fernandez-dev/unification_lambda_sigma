@@ -545,7 +545,12 @@ let rec put_metaVar_true (n : name) (ctx : meta_var_str) : meta_var_str =
   Map_str.add n (t,true) new_ctx 
 
 let rec grafting_metaVar (n : name) (t : s_term) (tsubst : s_term) : s_term =
-  failwith "genre on as pas de grafting nous"
+  match t with
+  | S_One -> S_One               
+  | S_Xvar n2 -> if n = n2 then tsubst else S_Xvar n2
+  | S_App (t1,t2) -> S_App (grafting_metaVar n t1 tsubst,grafting_metaVar n t2 tsubst)
+  | S_Abs (typ,t1) -> S_Abs(typ,grafting_metaVar n t1 tsubst)
+  | S_Tsub (t1,s) -> S_Tsub(grafting_metaVar n t1 tsubst,s)
               
 (* this function substitute the XVar by the term in the list *)
 let rec replace_and_list (n : name) (t : s_term) (s : and_list) : and_list =
