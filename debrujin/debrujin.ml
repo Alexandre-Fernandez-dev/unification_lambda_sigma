@@ -462,6 +462,43 @@ let rec get_type_without_end (typ : ty) =
   | Arrow (a, K(n)) -> a
   | Arrow (a, b) -> Arrow(a, get_type_without_end b)
 
+let rec pretty_print_list (l : 'a list) (p : 'a -> unit) =
+  match l with
+  | [] -> ()
+  | e :: tl -> p e; print_string ":";pretty_print_list tl p
+
+(* let print_meta_var (ctx : meta_var_str) = *)
+(*   Map_str.iter (fun x e -> print_string x; print_string  *)
+                                      
+                     
+let rec and_list_pretty_print (l : and_list) =
+  match l with
+  | [] -> ()
+  | DecEq (s1,s2) :: tl-> print_sigma_term s1; print_string " = " ;print_sigma_term s2 ;print_string "\n";and_list_pretty_print tl
+  | Exp :: tl-> print_string "Exp";and_list_pretty_print tl
+
+
+
+let print_unif_rules_ret (u : unif_rules_ret) =
+  match u with
+  | Ret ((al,_) :: tl) -> and_list_pretty_print al 
+  | Ret [] -> failwith "lol"
+  | Rep _ -> print_string "replace"
+  | Nope -> print_string "replace"
+  | Fail -> print_string "fail"
+
+                                                         
+let rec al_mv_l_to_mvl (l : ((and_list * meta_var_str) list)) : meta_var_str list =
+  match l with
+  | [] -> []
+  | (a,b) :: tl -> b :: al_mv_l_to_mvl tl
+
+let rec al_mv_l_to_al (l : ((and_list * meta_var_str) list)) : and_list list =
+  match l with
+  | [] -> []
+  | (a,b) :: tl -> a :: al_mv_l_to_al tl
+
+                         
                     
                     
                     
@@ -480,7 +517,6 @@ match l with
                     Ret(([new_equa], new_ctx) :: (match create_disjunctions xvar ct ctx tl with
                                                     | Ret res -> res
                                                     | _ -> []))
-                                          
 
 let unif_rules (e: equa) (ct : context) (ctx: meta_var_str) : unif_rules_ret =
   match e with
@@ -564,6 +600,9 @@ let rec replace_and_list (n : name) (t : s_term) (s : and_list) : and_list =
                | Exp -> replace_and_list n t tl
                )
 
+
+                                                         
+                                                         
                  
 let rec start_unification_list (l : ((and_list*meta_var_str) list)) (ct : context)
                                (su : (and_list * unif_rules_ret list)) : ((and_list*meta_var_str) list) option =
@@ -578,7 +617,8 @@ let rec start_unification_list (l : ((and_list*meta_var_str) list)) (ct : contex
                        | None -> Some res)
                         
 and unification_rec (s: and_list) (su : (and_list * unif_rules_ret list))
-                        (ctx : meta_var_str) (ct : context) : ((and_list * meta_var_str) list) option =
+                    (ctx : meta_var_str) (ct : context) : ((and_list * meta_var_str) list) option =
+  let () = and_list_pretty_print s in   
   if is_that_finished ctx then Some [(s,ctx)]
   else
     let (old_liste, ret_liste) = su in
@@ -608,35 +648,14 @@ and unification_rec (s: and_list) (su : (and_list * unif_rules_ret list))
         | Nope -> None
         | Fail -> None))
 
-let rec al_mv_l_to_mvl (l : ((and_list * meta_var_str) list)) : meta_var_str list =
-  match l with
-  | [] -> []
-  | (a,b) :: tl -> b :: al_mv_l_to_mvl tl
 
-let rec al_mv_l_to_al (l : ((and_list * meta_var_str) list)) : and_list list =
-  match l with
-  | [] -> []
-  | (a,b) :: tl -> a :: al_mv_l_to_al tl
       
 let unification (s: and_list) (ctx : meta_var_str) (ct : context) : (meta_var_str list*(and_list list)) option =
   match unification_rec s ([],[]) ctx ct with
   | None -> None
   | Some res -> Some (al_mv_l_to_mvl res,(al_mv_l_to_al res))
 
-let rec pretty_print_list (l : 'a list) (p : 'a -> unit) =
-  match l with
-  | [] -> ()
-  | e :: tl -> p e; pretty_print_list tl p
 
-(* let print_meta_var (ctx : meta_var_str) = *)
-(*   Map_str.iter (fun x e -> print_string x; print_string  *)
-                                      
-                     
-let rec and_list_pretty_print (l : and_list) =
-  match l with
-  | [] -> ()
-  | DecEq (s1,s2) :: tl-> print_sigma_term s1; print_string " = " ;print_sigma_term s2 ;print_string "\n";and_list_pretty_print tl
-  | Exp :: tl-> print_string "Exp";and_list_pretty_print tl
       
 (*   | S_One
   | S_Xvar of name
