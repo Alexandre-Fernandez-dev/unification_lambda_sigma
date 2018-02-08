@@ -557,7 +557,7 @@ let rec replace_and_list (n : name) (t : s_term) (s : and_list) : and_list =
   match s with
   | [] -> []
   | e :: tl -> (match e with
-               | DecEq (s1,s2) -> DecEq (grafting_metaVar n s1 t,grafting_metaVar n s2 t) :: replace_and_list n t tl
+               | DecEq (s1,s2) -> DecEq (s1,grafting_metaVar n s2 t) :: replace_and_list n t tl
                | Exp -> replace_and_list n t tl
                )
 
@@ -624,7 +624,10 @@ let rec pretty_print_list (l : 'a list) (p : 'a -> unit) =
   match l with
   | [] -> ()
   | e :: tl -> p e; pretty_print_list tl p
-  
+
+(* let print_meta_var (ctx : meta_var_str) = *)
+(*   Map_str.iter (fun x e -> print_string x; print_string  *)
+                                      
                      
 let rec and_list_pretty_print (l : and_list) =
   match l with
@@ -649,11 +652,25 @@ let test1_equa = [DecEq(S_Xvar "X", S_Abs(K "int",S_One))]
 let test1_ctx = Map_str.add "X" (Arrow(K "int",K "int"),false) Map_str.empty
 let test1_ct = []
 let run_test1 = unification test1_equa test1_ctx test1_ct
+let () = print_string "\n start test1 \n"
 let () =
   match run_test1 with
-  | Some (a,b) -> pretty_print_list b and_list_pretty_print
+  | Some (a,b) -> pretty_print_list b and_list_pretty_print;()
   | None -> ()
-                      
+let () = print_string "\n end test1 \n"
+
+
+let test2_equa = [DecEq(S_Abs(K "int",S_Xvar "X"), S_Abs(K "int",S_One))]
+let test2_ctx = Map_str.add "X" (K "int",false) Map_str.empty
+let test2_ct = []
+let run_test2 = unification test2_equa test2_ctx test2_ct
+let () = print_string "\n start test2 \n"
+let () =
+  match run_test2 with
+  | Some (a,b) -> pretty_print_list b and_list_pretty_print;()
+  | None -> ()
+let () = print_string "\n end test2 \n"
+
 
                        
     
