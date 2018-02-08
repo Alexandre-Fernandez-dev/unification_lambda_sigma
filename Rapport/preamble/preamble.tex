@@ -16,10 +16,11 @@
 \usepackage{mathabx}
 \usepackage{fancyhdr}
 \usepackage{float}
+\usepackage{amsthm}
 \pagestyle{fancy}
-\fancyhead[L]{}
+\fancyhead[L]{Higher Order Unification}
 \fancyhead[R]{}
-\cfoot{}
+\cfoot{\thepage}
 
 \usepackage{afterpage}
 \newcommand\blankpage{%
@@ -30,3 +31,20 @@
 }
 
 \pgfplotsset{compat=1.15}
+
+\theoremstyle{definition}
+\newtheorem{defn}{Definition}[subsection]
+
+\theoremstyle{plain}
+\newtheorem{prop}{Proposition}[subsection]
+
+\lstset{language={[Objective]Caml}}
+
+\newcommand{\lexp}{$\lambda$-expression}
+\newcommand{\lexps}{$\lambda$-expressions}
+\newcommand{\lterm}{$\lambda$-terme}
+\newcommand{\lterms}{$\lambda\sigma$-termes}
+\newcommand{\lsterm}{$\lambda\sigma$-terme}
+\newcommand{\lsterms}{$\lambda$-termes}
+\newcommand{\bred}{$\beta$-réduction}
+\newcommand{\breds}{$\beta$-réductions}

@@ -1,0 +1,40 @@
+\subsection{Forme normale}
+
+Comme on a pu le voir précédemment, les \lexps{} impliquent un certain nombre de réécritures via les \breds{}. Ainsi, on peut définir la forme normale d'un \lterm{} comme étant le terme réduit sur lequel on ne peut plus appliquer de réductions. Obtenir une telle forme est cruciale puisque l'algorithme d'unification que nous allons tenter d'implémenter travaille sur ces termes.
+Nous allons voir ici 2 notions de forme normale pour les \lterms{} : \textit{$\beta$-normal form} et \textit{$\eta$-long normal form}.
+
+\subsubsection{$\beta$-normal form}
+
+\begin{defn}
+Soit $a$ un \lterm{} correctement typé et de la forme \textit{$\beta$-normal}, alors $a$ est de la forme :
+\[
+    \lambda x_1 \dots \lambda x_n . h . e_1 \dots e_p
+\]
+avec $n, p \geq 0$, $h$ une constante, une variable liée ou une méta-variable, appelée \textit{tête} de $a$ et $e_1 \dots e_p$ sont des \lterms{} $\beta$-normalisés appelés \textit{arguments} de $h$.
+\end{defn}
+
+Il existe plusieurs qualifications aux $\beta$ normal forms (que l'on abrègera à partir de maintenant en \textit{bnfs}) que nous allons maintenant définir.
+
+\begin{defn}
+Un \lterm{} \textit{bnf} est dit \textit{rigid} si sa tête est une constante ou une variable liée. Sinon, on dit qu'il est \textit{flexible}, sa tête est alors une méta-variable.
+\end{defn}
+
+\subsubsection{$\eta$-long normal form}
+Dans cette partie nous allons définir la notion de $\eta$-long normal form utilisée par Dovek pour tenter de résoudre le problème de l'unification dans \cite{dowek1995higher}.
+
+\begin{defn}
+Soit $a$ un \lsterm{} de type $A_1 \xrightarrow{} \dots \xrightarrow{} A_n \xrightarrow{} B$ dans le contexte $\Gamma$ et de la forme $\lambda\sigma$-normal. La $\eta$-long normal form de $a$, notée $a'$, est défini par :
+\begin{enumerate}
+    \item Si $a = \lambda_Cb'$ alors $a' = \lambda_Cb'$.
+    \item Si $a = (\verb?k?b_1\dots b_p)$ alors $a' = \lambda_{A_1} \dots \lambda_{A_n}(n+n c_1\dots c_p \verb?n'?\dots \verb?1'?)$ avec $c_i$ la $\eta$-long normal form de la forme normale de $b_i[\uparrow^n]$.
+    \item Si $a = (X[s]b_1\dots b_p$ alors $a' = \lambda_{A_1}\dots \lambda_{A_n}(X[s']c_1\dots c_p\verb?n'?\dots \verb?1'?)$ avec $c_i$ la $\eta$-long normal form de la forme normale de $b_i[\uparrow^n]$ et si $s = d_1\dots d_q.\uparrow^k$ alors $s' = e_1\dots e_q.\uparrow^k+n$ où $e_i$ est $\eta$-long form de $d_i[\uparrow^n]$.
+\end{enumerate}
+
+\begin{defn}
+La \textit{long normal form} d'un terme est la \textit{$\eta$-long form} de sa $\beta\eta$-normal form.
+\end{defn}
+
+\begin{prop}
+Deux termes sont $\beta\eta$-équivalents si et seulement si ils ont la même \textit{long normal form}. 
+\end{prop}
+\end{defn}

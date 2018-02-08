@@ -1,0 +1,35 @@
+\subsection{$\lambda$-calcul}
+
+\begin{lstlisting}
+(* lambda terms *)
+type term =
+  | Var  of int
+  | XVar of name
+  | Abs  of ty * term
+  | App  of term * term
+\end{lstlisting}
+
+\begin{lstlisting}
+(* types *)
+type ty =
+  | K of name
+  | Arrow of ty * ty
+\end{lstlisting}
+
+\begin{lstlisting}
+(* lambda sigma substitutions and terms *)
+type s_subst =
+  (*| Yvar of name *)
+  | Id
+  | Shift
+  | Cons of s_term * s_subst
+  | Comp of s_subst * s_subst
+and s_term =
+  | S_One
+  | S_Xvar of name
+  | S_App of s_term * s_term
+  | S_Abs of ty * s_term
+  | S_Tsub of s_term * s_subst
+\end{lstlisting}
+
+% ----------------- TODO -----------------

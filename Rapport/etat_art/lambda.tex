@@ -1,0 +1,187 @@
+\subsection{$\lambda$-calcul}
+
+\subsubsection{$\lambda$-calcul nommé}
+
+Soit $V$ un ensemble de variables ($V={x,y,\dots}$). Les termes du $\lambda$-calcul sont définis par:
+
+\[ a ::= x \,|\, (a \, a) \,| \,\lambda x. a.\]
+
+Le terme $\lambda x.a$ représente la fonction qui a $x$ associe $a$ (le corps de la fonction), et le terme $(M \, N)$ représente le résultat de la fonction $M$ appliquée à $N$. Si on applique la fonction $\lambda x.a$ à un terme $b$, alors on obtient la valeur de $a$ pour laquelle toutes les occurrences de $x$ ont été remplacées par $b$. Cette opération est appelée $\beta$-réduction. Avant d’effectuer une $\beta$-réduction, les variables liées qui apparaissent à la fois dans $a$ et dans $b$ doivent se voir subir une $\alpha$-conversion: on renomme ces variables pour $a$ ou $b$ de sorte qu'aucune variable ne soit capturée par mégarde. Une autre règle, la $\eta$-réduction, est aussi ici introduite.
+
+\begin{defn}
+La $\beta$-réduction est définie par la règle:
+\[(\lambda x.a)b \xrightarrow{} \{x/b\}a\]
+La $\eta$-réduction est définie par la règle:
+\[(\lambda x).(a x) \xrightarrow{} a \quad \text{si } x \notin FV(a). \]
+\end{defn}
+
+\begin{defn}
+Soit $a$ un terme et $FV(a)$ l’ensemble des variables libres de $a$. Pour une évaluation $\theta$ liant les variables $x_1,\dots,x_n$ aux variables $a_1,\dots,a_n$, la substitution qui étend $\theta$ notée $\bar{\theta}={x_1/a_1,\dots,x_n/a_n}$ est définie par:
+
+\begin{align*}
+&\bar{\theta}x = \theta x \\
+&\bar{\theta}(a \, b) = (\bar{\theta}a \, \bar{\theta}b) \\
+& \bar{\theta}(\lambda y.a) = \lambda z (\bar{\theta}\{y/z\}a) 
+\end{align*}
+où $z$ est une nouvelle variable telle que $\theta z = z$, $z$ n'apparaît pas dans $a$, et $\forall{x} \in FV(a) \quad z \notin FV(\theta x)$.
+\end{defn}
+
+\subsubsection{Les variables d’unification}
+
+Dans un $\lambda$-terme, on peut distinguer plusieurs types de variables. Le premier type correspond aux variables liées qui ne sont pas concernées par les substitutions de l’unification. Le second correspond aux variables libres qui peuvent être alors séparées en deux classes:
+\begin{itemize}
+    \item Les constantes qui ne peuvent pas être substituées pendant l’unification.
+    \item Les vraies variables d’unification qui définissent le problème d’unification.
+\end{itemize}
+
+Ces dernières seront appelées les \textit{métavariables}. On notera $V$ l'ensemble des constantes et $H$ l'ensemble des métavariables.
+
+L'introduction de ces dernières nous permet alors de définir de manière plus précise les termes du $\lambda$-calcul:
+
+\begin{defn}
+L'ensemble $\Lambda(V,H)$ des $\lambda$-termes ouverts est défini par:
+\[ a ::= x \,|\, X \,|\, (a \, a) \,| \,\lambda x. a\]
+où $x \in V$ et $X \in H$.\\
+\end{defn}
+
+Nous avons donc maintenant deux notions de substitution:
+\begin{itemize}
+    \item la première fonctionne sur $V$: elle est utilisée pour la $\beta$-réduction.
+    \item la second fonctionne sur $H$: elle est utilisée pour l'unification.
+\end{itemize}
+
+Le même problème cité précédemment appraît encore: si on substitue une variable par un terme contenant des constantes, certaines d'entre elles peuvent être capturées, comme l'illustre l'exmple suivant:
+\[\{ X \mapsto x \}(\lambda x . X) = \lambda x . x\]
+
+Nous devons donc de nouveau définir la notion de substitution avec renommage des variables liées:
+
+\begin{defn}
+Soit $\theta$ une évaluation (une fonction de $H$ dans $\Lambda(V,H)$. La substitution $\bar{\theta}$ est l'extension de cette évaluation telle que:
+\begin{enumerate}
+    \item $\bar{\theta} (X) = \theta (X)$
+    \item $\bar{\theta} (x) = x$ si $x \in V$
+    \item $\bar{\theta}(a \, b) = (\bar{\theta}(a) \, \bar{\theta}(b))$
+    \item $\bar{\theta}(\lambda y . a) = \lambda z . \bar{\theta} (\{ y / z \} a)$ où $z$ est une nouvelle variable.
+\end{enumerate}
+$\bar{\theta}$ sera maintenant notée $\theta$.
+\end{defn}
+
+\begin{prop}
+Les substitutions et les réductions commutent.
+\end{prop}
+
+\subsubsection{$\lambda$-calcul avec la notation de de Bruijn}
+
+Dans le $\lambda$-calcul nommé vu précédemment, on nomme toujours les variables liées alors que ces noms ne sont en rien utiles à notre problème utiles.Cette gestion du renommage des variables, qui peut parfois être très complexe, peut être évitée en utilisant une autre formulation du $\lambda$-calcul: la notation de de Bruijn. On en présente ici le principe (en ajoutant directement les métavariables).
+
+\begin{defn}
+L’ensemble $\Lambda_{DB}(H)$ des $\lambda$-termes dans la notation de de Bruijn est défini par:
+
+\[ a::= n \, |\, X \,| \,\lambda \, a \,|\, (a \, a) \]
+
+où $n$ est un entier supérieur ou égal à $1$ et $X \in H$.
+\end{defn}
+
+On a donc remplacé ici les variables liées et les constantes par des indices, mais on conserve les noms pour les métavariables. De plus, la notation de de Bruijn introduit aussi la notion de référentiel: les $V$-variables (i.e. les variables liées et les constantes, mais pas les métavariables) sont ordonnés dans une liste $(x_0 \dots x_n)$ qui définit le référentiel $R$.
+
+\begin{defn}
+Soit $R$ un référentiel. Soit $a \in \Lambda(V,H)$ tel que toutes les $V$-variables libres de $a$ sont déclarées dans $R$. La translation de de Bruijn de $a$, notée $tr(a,R)$ est définie par:
+\begin{enumerate}
+    \item $tr(x,R) = j$, où $j$ est l’indice de la première occurence de x dans $R$
+    \item $tr(X,R) = X$
+    \item $tr((a \, b),R) = (tr(a,R) \, tr(b,R))$
+    \item $tr(\lambda x . a, R) = \lambda (tr(a, x . R))$
+\end{enumerate}
+\end{defn}
+
+Ainsi, pendant une translation de de Bruijn, le référentiel est incrémenté lorsque l’on rencontre un $\lambda$. Par exemple:
+
+\[ \lambda x \, \lambda y . (x ( \lambda z . (z \, x)) y) \] 
+s’écrit maintenant:
+
+\[ \lambda ( \lambda (2 (\lambda 1 \, 3) 1 )) \]
+
+\begin{defn}
+La $\lambda-longueur$ d’une occurence $u$ dans un terme $a$ est le nombre de « prefix » occurrences de $u$. Elle est notée $|u|$.
+\end{defn}
+
+On doit maintenant définir la substitution qui correspond à la substitution des éléments de $V$.
+
+\begin{defn}
+Soit $a \in \Lambda_{DB}(H)$. Le terme $a^{+}$, appelé \textit{lift} de $a$, est défini par $a^{+} = lft(a,0)$ où $lft(a,i)$ est défini par:
+\begin{enumerate}
+    \item $lft((a_1 \, a_2),i) = (lft(a_1,i) \, lft(a_2,i))$
+    \item $lft(\lambda a, i) = \lambda (lft(a,i+1))$
+    \item $lft(X,i) = X$
+    \item $lft(m,i) = m + 1$ si $m > i$, $m$ sinon.
+\end{enumerate}
+\end{defn}
+
+On définit maintenant l’analogue de la $V$-substitution de $\Lambda(V,H)$.
+
+\begin{defn}
+La substitution par $b$ à la $\lambda$-longueur $(n-1)$ dans $a$, notée $\{n/b\}a$, est défini par:
+\begin{align*}
+\{n/b\}(a_1 \, a_2) &= (\{n/b\} a_1 \, \{n/b\} a_2) \\
+\{n/b\} X &= X \\
+\{n/b\} \lambda a &= \lambda (\{n+1/b^{+}\} a) \\
+\{n/b\} m &= m-1 \quad \text{si $m > n$ ($m \in FV(a)$)} \\
+&\quad \quad b \quad \text{si $m=n$ ($m$ lié par le $\lambda$ du $\beta$-redex)} \\
+&\quad \quad m \quad \text{si $m < n$ ($m \in BV(a)$)}
+\end{align*}
+\end{defn}
+
+\begin{defn}
+La $\beta$-réduction, dans ce contexte, est définie naturellement pas:
+
+\[ ((\lambda a)b) \xrightarrow{}{\{1/b\}} a \]
+
+où $\{1/b\}$ est la substitution de l’indice $1$ par le terme $b$.
+\end{defn}
+
+Par exemple, le terme $\lambda x . (( \lambda y . (x \, y)) x)$ s’écrit $\lambda (( \lambda (2 \, 1))1)$ dans la notation de de Bruijn. Il se réduit en $\lambda x . (x \, x)$, ou, dans la notation de de Bruijn, en $\lambda (\{1/1\}(2 \, 1)) = \lambda (1 \, 1)$.
+
+\begin{defn}
+La $\eta$-réduction dans $\Lambda_{DB}(H)$ est définie par la règle:
+
+\[ \lambda (a \, 1) \xrightarrow{}{b} \quad \text{si $b \in \Lambda_{DB}(H)$ est tel que $a = b^{+}$.} \]
+
+\end{defn}
+
+\begin{prop}
+Pour un terme $a$ de $\Lambda_{DB}(H)$, il existe un terme $b$ tel que $a=b^{+}$ si et seulement si, pour toute occurrence $u$ d’indice $p$ dans $a$, $p \neq |u| + 1$.
+\end{prop}
+
+Enfin, nous définissons la $H$-substitution. $\theta^{+}$ est défini par $\theta^{+} = \{X_1/a_1^{+}, \dots, X_n/a_n^{+}\}$ quand $\theta = \{X_1/a_1, \dots , X_n/a_n\}$.
+
+\begin{defn}
+Soit $\theta$ une évaluation de $H$ dans $\Lambda_{DB}(H)$. La substitution $\bar{\theta}$ associée est définie par les règles:
+\begin{enumerate}
+    \item $\bar{\theta} (X) = \theta (X)$
+    \item $\bar{\theta} (n) = n$
+    \item $\bar{\theta} (a_1,a_2) = (\bar{\theta} (a_1) \bar{\theta} (a_2))$
+    \item $\bar{\theta} (\lambda a) = \lambda (\bar{\theta}^{+} (a))$
+\end{enumerate}
+\end{defn}
+
+La relation entre la substitution dans le $\lambda$-calcul simple et la substitution dans le $\lambda$-calcul avec les indices de de Bruijn s’exprime selon la proposition suivante:
+
+\begin{prop}
+Soit $a \in \Lambda(V,H)$ et $\theta = \{ X_1/a_1, \dots, X_n / a_n \}$ un terme et une substitution d’un $\lambda$-calcul simple. Soit $\theta^{r} = \{ X_1 / tr(a_1,R), \dots, X_n / tr(a_n,R) \}$. Alors $tr(\theta (a),R) = \theta^{r}(tr(a,R))$.
+\end{prop}
+
+\subsubsection{Le $\lambda \sigma$-calcul}
+
+Les $\lambda \sigma$-calculs contiennent le $\lambda$-calcul écrit avec la notation de de Bruijn, ainsi que les $\beta$ et $\eta$ réductions. Ils sont différents de part la manière dont ils traitent les substitutions. Essayons de comprendre l’origine du $\lambda \sigma$-calcul. \\
+
+Soit $F$ une fonction de $A$ dans $A$. Par exemple: $F(0)=0$, $F(S(0))=S(S(0))$, $F(S(S(0)))=S(S(S(S(0))))$, etc. Une autre manière de définir cet opérateur va consister à introduire un autre opérateur $f$ permettant de placer l’opération $F$ en interne, ainsi que des règles permettant de réécrire les expressions contenant $f$ en d’autres expressions ne contenant pas forcément $f$. Par exemple:
+
+\begin{align*}
+f(0) &\xrightarrow{}{0} \\
+f(S(X)) &\xrightarrow{}{S(S(f(x)))}
+\end{align*}
+
+Dans le $\lambda$-calcul simple, les applications sont déjà placées en interne, mais les substitutions et le \textit{lifting} se traitent encore de façon externe. Le $\lambda \sigma$-calcul, lui, place de façon interne les substitutions et le \textit{lifting}. \\
+
+Introduisons quelques représentations utiles. Les listes sont représentées par une opérateur \textit{cons} (noté « . ») et un opérateur pour la liste vide (noté $id$). La substitution $a_1.a_2. \dots a_n . id$ remplace 1 par $a_1$, $\dots$, $n$ par $a_n$, et décrémente par $n$ tous les autres indices (libres) dans le terme. L’opérateur $\uparrow$ qui permet de placer en interne le \textit{lifting} opérateur $a^{+}$ peut être vu comme une substitution infinie $2.3.4.\dots$. On introduit également un opérateur de composition $\circ$. …….
+
