@@ -485,20 +485,23 @@ match l with
 let unif_rules (e: equa) (ct : context) (ctx: meta_var_str) : unif_rules_ret =
   match e with
   (* DEC LAM *)
-  | DecEq (S_Abs (typ1, t1), S_Abs (typ2, t2)) -> if eq_typ typ1 typ2 then Ret [([ DecEq (t1, t2)], ctx)] else Fail
+  | DecEq (S_Abs (typ1, t1), S_Abs (typ2, t2)) -> let () = Printf.printf "Dec Lam\n " in
+     if eq_typ typ1 typ2 then Ret [([ DecEq (t1, t2)], ctx)] else Fail
   (* DEC APP *)
-  | DecEq (S_App (t1, t2), S_App (t3, t4)) ->
+  | DecEq (S_App (t1, t2), S_App (t3, t4)) -> let () = Printf.printf "Dec App\n " in
     if t1 = t3 then Ret [([DecEq (t2, t4)], ctx)]
       else Fail
   (* REP *)
-  | DecEq (S_Xvar (n), t) -> Rep (n, t, [e])
+  | DecEq (S_Xvar (n), t) -> let () = Printf.printf "Rep\n " in
+                             Rep (n, t, [e])
   (* EXP APP *)
-  | DecEq (S_Tsub (S_Xvar(x), s), t) ->
+  | DecEq (S_Tsub (S_Xvar(x), s), t) -> let () = Printf.printf "Exp App\n " in
     let (typ, _) = Map_str.find x ctx in
     let lst = find_var_end_typ ct typ in
     create_disjunctions (S_Xvar (x)) ct ctx lst
   (* EXP LAM*)
-  | Exp -> let arrow_metavars =
+  | Exp -> let () = Printf.printf "Exp Lam\n " in
+     let arrow_metavars =
             Map_str.filter(fun k tb -> match tb with
                                 | Arrow (_,_), false -> true 
                                 | _ -> false) ctx in
@@ -651,8 +654,9 @@ let () = Printf.printf "\nStarting unification tests \n"
 let test1_equa = [DecEq(S_Xvar "X", S_Abs(K "int",S_One))]
 let test1_ctx = Map_str.add "X" (Arrow(K "int",K "int"),false) Map_str.empty
 let test1_ct = []
-let run_test1 = unification test1_equa test1_ctx test1_ct
 let () = print_string "\n start test1 \n"
+let run_test1 = unification test1_equa test1_ctx test1_ct
+
 let () =
   match run_test1 with
   | Some (a,b) -> pretty_print_list b and_list_pretty_print;()
@@ -663,8 +667,9 @@ let () = print_string "\n end test1 \n"
 let test2_equa = [DecEq(S_Abs(K "int",S_Xvar "X"), S_Abs(K "int",S_One))]
 let test2_ctx = Map_str.add "X" (K "int",false) Map_str.empty
 let test2_ct = []
-let run_test2 = unification test2_equa test2_ctx test2_ct
 let () = print_string "\n start test2 \n"
+let run_test2 = unification test2_equa test2_ctx test2_ct
+
 let () =
   match run_test2 with
   | Some (a,b) -> pretty_print_list b and_list_pretty_print;()
@@ -672,6 +677,17 @@ let () =
 let () = print_string "\n end test2 \n"
 
 
+
+let test3_equa = [DecEq(S_Abs(K "int",S_Tsub (S_Xvar "X",s_shift_n 2)), S_Abs(K "int",S_Tsub(S_One,s_shift_n 2)))]
+let test3_ctx = Map_str.add "X" (Arrow (K "a",K "a"),false) Map_str.empty
+let test3_ct = [(K "a")]
+let () = print_string "\n start test3 \n"
+let run_test3 = unification test3_equa test3_ctx test3_ct
+let () =
+  match run_test3 with
+  | Some (a,b) -> pretty_print_list b and_list_pretty_print;()
+  | None -> ()
+let () = print_string "\n end test3 \n"
                        
     
     
