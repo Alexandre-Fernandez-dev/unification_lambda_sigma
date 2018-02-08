@@ -544,13 +544,32 @@ let rec put_metaVar_true (n : name) (ctx : meta_var_str) : meta_var_str =
   let new_ctx = Map_str.remove n ctx in
   Map_str.add n (t,true) new_ctx 
 
+let rec grafting_metaVar (n : name) (t : s_term) (tsubst : s_term) : s_term =
+  failwith "genre on as pas de grafting nous"
+              
+(* this function substitute the XVar by the term in the list *)
 let rec replace_and_list (n : name) (t : s_term) (s : and_list) : and_list =
-  failwith "todo later"
+  match s with
+  | [] -> []
+  | e :: tl -> (match e with
+               | DecEq (s1,s2) -> DecEq (grafting_metaVar n s1 t,grafting_metaVar n s2 t) :: replace_and_list n t tl
+               | Exp -> replace_and_list n t tl
+               )
 
-let rec start_unification_list (l : ((and_list*meta_var_str) list)) : ((and_list*meta_var_str) list) option =
-  failwith "cette fonction lance juste sur tous les subgoals"
-           
-let rec unification_rec (s: and_list) (su : (and_list * unif_rules_ret list))
+                 
+let rec start_unification_list (l : ((and_list*meta_var_str) list)) (ct : context)
+                               (su : (and_list * unif_rules_ret list)) : ((and_list*meta_var_str) list) option =
+  match l with
+  | [] -> None
+  | (al,ctx) :: tl -> let res =
+                    (match start_unification_list tl ct su with
+                    | None -> []                                
+                    | Some r -> r) in
+                      (match unification_rec al su ctx ct with
+                       | Some res2 -> Some (res2 @ res)
+                       | None -> Some res)
+                        
+and unification_rec (s: and_list) (su : (and_list * unif_rules_ret list))
                         (ctx : meta_var_str) (ct : context) : ((and_list * meta_var_str) list) option =
   if is_that_finished ctx then Some [(s,ctx)]
   else
@@ -558,12 +577,12 @@ let rec unification_rec (s: and_list) (su : (and_list * unif_rules_ret list))
     (match s with
      | [] -> (match look_res_list ret_liste with 
               | FullNope -> (match unif_rules Exp ct ctx with
-                             | Ret l -> start_unification_list l
+                             | Ret l -> start_unification_list l ct su
                              | Rep (res_name,res_term,res_s) -> unification_rec (replace_and_list res_name res_term (old_liste @ res_s)) 
                                                                                    ([],[])
                                                                                 (put_metaVar_true res_name ctx)
                                                                                 ct 
-                             | Nope -> failwith "maybe we need to stop i don't know need to think about"  
+                             | Nope -> None
                              | Fail -> None)                           
               | OneRet -> unification_rec (fst su) ([],[]) ctx ct
               | Failed -> None)
@@ -572,5 +591,11 @@ let rec unification_rec (s: and_list) (su : (and_list * unif_rules_ret list))
         let ret = unif_rules a ct ctx in
         (* todo ICI il faut faire un match sur ret pour traiter tous les cas et récupérer le nouveau ctx de metavariables *)
         let new_su = (old_liste @ [a] ,ret_liste @ [ret]) in
-        failwith "unification_rec tl new_su ")
-  
+        (match ret with  (* unification_rec tl new_su *)
+        | Ret l -> start_unification_list l ct new_su
+        | Rep (res_name,res_term,res_s) -> unification_rec (replace_and_list res_name res_term (old_liste @ res_s)) 
+                                                                                   ([],[])
+                                                                                (put_metaVar_true res_name ctx)
+                                                                                ct 
+        | Nope -> None
+        | Fail -> None))
