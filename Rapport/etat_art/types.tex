@@ -1,0 +1,54 @@
+\subsection{Typage}
+
+
+% PRO TIPS : \lc{} => écrit lambda-calcul avec le symbole
+Afin de réaliser l'unification, les types sont nécessaires.
+TODO NOUS EN REPARLERONS PLUS TARD METTRE LE LIEN
+Les règles pour les termes sont les mêmes que celles du \lc{} simplement typé. Voici les règles impliquant des substitutions:
+ 
+\textbf{Clos}:
+\[ \frac{\Gamma \vdash s \rhd \Gamma' \quad \quad \Gamma' \vdash a:A}{\Gamma \vdash a[s]:A} \]
+
+\textbf{Id}:
+\[ \Gamma \vdash id \rhd \Gamma \]
+
+\textbf{Shift}:
+\[ A.\Gamma \vdash \uparrow \rhd \Gamma \]
+
+\textbf{Cons}:
+\[ \frac{\Gamma \vdash a:A \quad \quad \Gamma \vdash s \rhd \Gamma'}{\Gamma \vdash a.s \rhd A.\Gamma'}\]
+
+\textbf{Comp}:
+\[ \frac{\Gamma \vdash s'' \rhd \Gamma'' \quad \quad \Gamma'' \vdash s'\rhd \Gamma'}{\Gamma \vdash s' \circ s'' \rhd \Gamma'} \]
+ 
+\begin{prop}
+Le \lsc{} typé est :
+\begin{itemize}
+    \item confluent
+    \item faiblement normalisable
+\end{itemize}
+\end{prop}
+ 
+L'algorithme de typage que nous utilisons est celui du \lc{} simplement typé avec inférence de type.
+
+
+\paragraph{Implémentation}
+
+Focalisons nous simplement sur l'implémentation des règles concernant les substitutions :
+
+\begin{lstlisting}
+and type_check_cont c t_sub m_c =
+  match t_sub with
+  | Id           -> c
+  | Shift        -> (match c with
+      | []     -> raise No_inference
+      | hd::tl -> tl)
+  | Cons(t, s)   -> let c_s = type_check_cont c s m_c in
+    let ty_t = type_check_inf c t m_c in
+    ty_t::c_s
+  | Comp(s1, s2) -> let c_s2 = type_check_cont c s2 m_c in
+    type_check_cont c_s2 s1 m_c 
+\end{lstlisting}
+
+
+

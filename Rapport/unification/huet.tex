@@ -1,0 +1,117 @@
+\subsection{Algorithme de Huet}
+
+L'algorithme de Huet prend en entrée une équation ou un système d'équation représentant des problèmes d'unification. Les membres de chaque équation doivent avoir été mises en $\eta$-long normal form. 
+
+\subsubsection{Quelques définitions préliminaires}
+On appelle tête d'un terme en $\eta$-long normal form la première variable sous les n lambda qui commencent ce terme. Cette tête peut donc être un indice de Debruijn (si la variable en question est une variable lié ou libre) ou une métavariable.
+\paragraph{}
+On dit d'une équation d'unfication qu'elle est rigide-rigide si les têtes des deux termes de l'équation sont des indices de Debruijn, flexible-rigide si l'une des têtes et une métavariable et l'autre un indice de Debruijn ou flexible-flexible si les deux têtes sont des métavariables.
+\paragraph{}
+
+Nous avons donc besoin de quelques primitives pour l'implémentation.
+\begin{lstlisting}
+type terminal =
+| Success
+| Failure
+
+type equationsys =
+| Eq of s_term * s_term
+| SysEq of equationsys * equationsys
+| NotAnEq
+
+type simplresult = 
+| Term of terminal
+| Sys of equationsys
+
+let rec extract_head ( t1 : s_term ) : s_term =
+  match t1 with
+  | S_Abs (ty, t) -> extract_head (t)
+  | S_App (t2, t3) -> t2
+  | _ -> t1
+
+let rec is_rigid_rigid ( t1 : s_term ) ( t2 : s_term ) : bool =
+  if (is_number(extract_head (t1))&&is_number(extract_head (t2))) then true else false
+
+let rec is_flexible_rigid ( t1 : s_term ) ( t2 : s_term ) : bool =
+  if ((!is_number(extract_head (t1))&&is_number(extract_head (t2)))||(!is_number(extract_head (t1))&&is_number(extract_head (t2)))) then true else false
+
+let rec is_flexible_flexible ( t1 : s_term ) ( t2 : s_term ) : bool =
+  if (!is_number(extract_head (t1))&&!is_number(extract_head (t2))) then true else false
+\end{lstlisting}
+
+\subsubsection{Principe de l'algorithme de Huet}
+Ces concepts sont importants pour l'algorithme de Huet. Celui-ci s'arrête en indiquant un succés d'unification si toutes les équations du système sont de forme flexible-flexible, car cela signifie que les têtes des termes sont toutes des métavariables et qu'il sera alors trivial de trouver une substitution qui permettra d'unifier ces équations.
+
+
+\subsubsection{Procédure SIMPL}
+Ainsi, l'algorithme de Huet commence par détecter les équations rigide-rigide et tente d'appliquer la procédure \verb?SIMPL?.
+\paragraph{}
+
+La procédure \verb?SIMPL? va sélectionner une équation rigide-rigide dans le système. Si les têtes de ces deux termes sont des indices de Debruijn différents, alors \verb?SIMPL? retourne un rapport d'échec, le système n'est pas unifiable. Sinon, on va remplacer cette équation par un ensemble de k équations d'unification. La i-ème équation ainsi créée consistera en un problème d'unification entre les i-ème termes succédant les têtes des deux termes, sur lesquels on aura pris soin de remettre les n lambdas des termes originaux. 
+
+\paragraph{}
+Cette procédure \verb?SIMPL? va boucler jusqu'à ce qu'il n'existe plus aucune équation rigide-rigide dans le système.
+
+\paragraph{}
+A l'issue de la procédure \verb?SIMPL?, s'il n'existe que des équations flexible-flexible dans le système, le problème est considéré unifiable. Sinon, s'il reste des équations flexible-rigide, on leur applique la procédure \verb?MATCH?, qui aura pour but de trouver une substitution de la méta-variable en tête de l'un des termes en un nouveau terme.
+
+\paragraph{}
+\textbf{Implémentation} :
+\begin{lstlisting}
+let rec get_new_eq (s: equationsys)(t:s_term) : equationsys = match s with
+  | NotAnEq -> NotAnEq
+  | Eq (t1, t2) -> match t1 with
+    | S_Abs (ty1, t3) -> match t2 with
+      | S_Abs (ty2, t4) -> apply_lambda(get_new_eq (Eq(t3,t4), t)  ,ty)
+      | _ -> Eq (t3,t4)
+    | S_App (t3, t4) -> match t2 with
+      | S_App (t5, t6) -> if t3 == t then get_new_eq (Eq (t4, t6), t) else SysEq(Eq(t3,t5), get_new_eq (Eq(t4,t6)))
+      | _-> Eq(t1,t2)
+  | _ -> Eq(t1,t2)
+
+  let rec huet_simpl ( s: equationsys ) : simplresult = 
+  if  contains_rigid_rigid (s) then
+    match get_rigid_rigid (s) with
+    | Eq (t1, t2) -> if get_number (extract_head(t1)) != get_number (extract_head(t2)) then Failure else
+      huet_simpl(Sys_Eq(delete_from_sys(Eq(t1,t2), s), get_new_eq(Eq(t1,t2), extract_head(t1))))
+    | _ -> Failure
+  else
+    if contains_flexible_rigid (s) then s else Success
+\end{lstlisting}
+
+\subsubsection{Procédure MATCH}
+La procédure \verb?MATCH? va essayer d'appliquer de manière non-déterministe deux procédures différentes, la procédure d'imitation et la procédure de projection.
+
+\subsubsection{Procédure d'imitation}
+La procédure d'imitation consiste à remplacer dans le terme flexible toutes les occurrences de la tête de ce terme (qui se trouve donc être une métavariable) par un terme en \elnf{} constitué de plusieurs lambda correspondant au type de la métavariable (par exemple si la métavariable est de type $B_1\xrightarrow{}B_2\xrightarrow{}\dots\xrightarrow{}B_p$ ont aura $p$ lambdas respectivement de type $B_1B_2\dots B_p$), suivis d'un indice de Debruijn (égal au nombre de termes suivant initialement la métavariable dans le terme flexible de l'équation + l'indice de Debruijn qui est la tête du terme rigide de l'équation - le nombre de lambda qui précèdent initialement la tête du terme), suivis de termes (un nombre de terme égal au nombre de termes succédant la tête du terme rigide de l'équation dans le dit terme) qui sont constitués d'applications d'une nouvelle métavariable à une application à un indice de Debruijn égal au nombre de termes après la tête dans le terme rigide de l'équation initiale appliquée à une application d'un indice de Debruijn égal à ce nombre de termes - 1 ... et ainsi de suite jusqu'à 1. On a ainsi introduit plusieurs nouvelles méta-variables de même type que la méta-variable initiale qu'on va tenter d'unifier par la suite.
+
+\paragraph{}
+\textbf{Implémentation partielle} :
+\begin{lstlisting}
+let rec get_new_eq (s: equationsys)(t:s_term) : equationsys = match s with
+  | NotAnEq -> NotAnEq
+  | Eq (t1, t2) -> match t1 with
+    | S_Abs (ty1, t3) -> match t2 with
+      | S_Abs (ty2, t4) -> apply_lambda(get_new_eq (Eq(t3,t4), t)  ,ty)
+      | _ -> Eq (t3,t4)
+    | S_App (t3, t4) -> match t2 with
+      | S_App (t5, t6) -> if t3 == t then get_new_eq (Eq (t4, t6), t) else SysEq(Eq(t3,t5), get_new_eq (Eq(t4,t6)))
+      | _-> Eq(t1,t2)
+  | _ -> Eq(t1,t2)
+
+  let rec huet_simpl ( s: equationsys ) : simplresult = 
+  if  contains_rigid_rigid (s) then
+    match get_rigid_rigid (s) with
+    | Eq (t1, t2) -> if get_number (extract_head(t1)) != get_number (extract_head(t2)) then Failure else
+      huet_simpl(Sys_Eq(delete_from_sys(Eq(t1,t2), s), get_new_eq(Eq(t1,t2), extract_head(t1))))
+    | _ -> Failure
+  else
+    if contains_flexible_rigid (s) then s else Success
+\end{lstlisting}
+
+\subsubsection{Procédure de projection}
+La procédure de projection va créer plusieurs substitutions comme suit: pour le i-ème terme suivant la tête du terme flexible, si ce terme a un type ayant pour cible le même type que la métavariable en tête du terme, on créait une substitution de la méta-variable par un terme composé d'un nombre de lambda égal au nombre de termes suivant la tête dans le terme flexible initial, d'un indice de Debruijn égal à ce nombre de termes $- i + 1$, d'un nombre de termes correspondant au type du i-ème terme choisi (par exemple s'il est de type $D_1 \xrightarrow{} D_2 \xrightarrow{} \dots \xrightarrow{} D_q$, on créait $q$ termes) chacun composé d'une métavariable(telle que la j-ème métavariable ainsi créée soit de type $B_1 \xrightarrow{} \dots \xrightarrow{} B_{p_1} \xrightarrow{} D_j$ où $B_1 \xrightarrow{} \dots \xrightarrow{} B_{p_1} \xrightarrow{} A$ étant le type de la métavariable tête de terme initial), suivi d'indices de Debruijn décroissants du nombre de termes succédant à la tête de terme initial jusqu'à 1.
+Pour chaque terme valide, on créait donc un nouveau problème d'unification. L'unification est un succès (respectivement un échec) si tous les problèmes ainsi générés aboutissent à un succès (respectivement à un échec)
+
+\subsubsection{Conclusion sur l'alorithme d'Huet}
+La procédure \verb?MATCH? va donc introduire de nouvelles méta-variables et la procédure \verb?SIMPL? va supprimer des indices de Debruijn, le but étant de n'obtenir des équations qu'entre des termes dont la tête est une métavariable. Cependant, il est possible que l'algorithme tourne en boucle, générant à chaque fois de nouvelles métavariables qui n'amèneront jamais à des équations flexible-flexible. Il est donc possible que l'algorithme de Huet ne se termine pas. Dans le cas contraire, il indiquera une unification possible ou une impossibilité d'unification.

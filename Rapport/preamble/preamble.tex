@@ -38,8 +38,15 @@
 \theoremstyle{plain}
 \newtheorem{prop}{Proposition}[subsection]
 
-\lstset{language={[Objective]Caml}}
+\theoremstyle{plain}
+\newtheorem{rappel}{Rappel}[]
 
+\lstset{
+    language={[Objective]Caml},
+    breaklines=true,
+}
+
+\newcommand{\E}{É}
 \newcommand{\lexp}{$\lambda$-expression}
 \newcommand{\lexps}{$\lambda$-expressions}
 \newcommand{\lterm}{$\lambda$-terme}
@@ -48,3 +55,7 @@
 \newcommand{\lsterms}{$\lambda$-termes}
 \newcommand{\bred}{$\beta$-réduction}
 \newcommand{\breds}{$\beta$-réductions}
+\newcommand{\lsc}{$\lambda\sigma$-calcul}
+\newcommand{\lc}{$\lambda$-calcul}
+\newcommand{\elnf}{\textit{$\eta$-long normal form}}
+\newcommand{\eqls}{=^{?}_{\lambda\sigma}}
