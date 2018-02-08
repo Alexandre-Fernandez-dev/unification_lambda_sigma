@@ -1,0 +1,58 @@
+\section{Unification \textit{higher order} par l'exemple}
+
+Nous allons, dans cette partie, résoudre un problème simple d'unification pour illustrer le fonctionnement de l'algorithme.
+
+Soit le problème suivant, encodé en de Bruijn, que l'on va essayer de résoudre :
+\[
+\lambda_Ay.(Xa) =^{?}_{\beta\eta} \lambda_Ay.a
+\]
+avec
+\[
+a : X
+\]
+\[
+X : A\xrightarrow{}A
+\]
+Cette équation est encodé en de Bruijn en utilisant le contexte suivant :
+\[
+\Gamma = A.nil
+\]
+On obtient alors :
+\[
+\lambda(X \verb?2?) =^{?}_{\beta\eta} \lambda\verb?2?
+\]
+On obtient ensuite après l'étape de \textbf{\textit{precooking}} :
+\[
+\lambda(X[\uparrow]\verb?2?) \eqls \lambda\verb?2?
+\]
+On applique la règle \textbf{Exp-$\lambda$} :
+\[
+\exists Y((X[\uparrow]\verb?2?) \eqls \verb?2?) \land (X \eqls \lambda Y)
+\]
+avec $\Gamma _Y = A.\Gamma$ et $T_Y = A$. En appliquant la règle \textbf{Replace} on a :
+\[
+\exists Y(((\lambda Y)[\uparrow]\verb?2?) \eqls \verb?2?) \land (X \eqls \lambda Y)
+\]
+Avec \textbf{Normalize} on a :
+\[
+\exists Y(Y[\verb?2?.\uparrow] \eqls \verb?2? \land (X \eqls \lambda Y)
+\]
+En appliquant la règle \textbf{Exp-App} on a :
+\[
+\exists Y(Y[\verb?2?.\uparrow] \eqls \verb?2?) \land (X \eqls \lambda Y) \land (Y = \verb?1?)
+\]
+\[
+\lor
+\]
+\[
+\exists Y(Y[\verb?2?.\uparrow] \eqls \verb?2?) \land (X \eqls \lambda Y) \land (Y = \verb?2?)
+\]
+On réduit ensuite avec la règle \textbf{Replace}
+\[
+(\verb?1?[\verb?2?.\uparrow] \eqls  \verb?2?) \land (X \eqls \lambda \verb?1?) \lor (\verb?2?[\verb?2?.\uparrow] \eqls \verb?2?) \land (X \eqls \lambda\verb?2?)
+\]
+Enfin, en normalisant avec la règle \textbf{Normalize}, on a :
+\[
+(X \eqls \lambda\verb?1?) \lor (X \eqls \lambda\verb?2?)
+\]
+On a donc 2 solutions possibles au problème posé initialement.

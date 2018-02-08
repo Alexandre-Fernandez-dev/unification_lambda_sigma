@@ -19,16 +19,90 @@ Il existe plusieurs qualifications aux $\beta$ normal forms (que l'on abrègera 
 Un \lterm{} \textit{bnf} est dit \textit{rigid} si sa tête est une constante ou une variable liée. Sinon, on dit qu'il est \textit{flexible}, sa tête est alors une méta-variable.
 \end{defn}
 
+Pour obtenir la $\beta$-normal form, il faut appliquer la règle de réduction $\beta$ jusqu'a ce que l'on ne puisse plus réduire. cela fonctionne dans le \lc{} car il est confluant avec la $\beta$-réduction, ie. il n'existe qu'une seule forme normale.
+\noindent
+\\
+Dans le cadre du \lsc{} des règles de réduction supplémentaires sont nécessaires, les règles réductions $\sigma$ travaillent sur les substitution explicites.
+Cependant, avec l'introduction des méta-variables, la règle $\beta$ et les règles $\sigma$ ne suffisent pas pour assurer la confluence du \lsc{}.
+L'utilisation de la règle $\eta$ accompagné d'un système de types simples permet de rendre le \lsc{} confluent.
+~\\
+\\
+Les règles de réductions du \lsc{} sont :
+\begin{description}
+    \item \textbf{Beta} : \[ (\lambda a) b \xrightarrow{} a[b.id] \]
+    \item \textbf{App} : \[ (a \, b)[s] \xrightarrow{} (a[s] \, b[s]) \]
+    \item \textbf{VarCons} : \[ 1[a.s] \xrightarrow{} a \]
+    \item \textbf{Id} : \[ a[id] \xrightarrow{} a \]
+    \item \textbf{Abs} : \[ (\lambda a)[s] \xrightarrow{} \lambda ( a [1 . (s \circ \uparrow)]) \]
+    \item \textbf{Clos} : \[ (a[s])[t] \xrightarrow{} a[s \circ t] \]
+    \item \textbf{IdL} : \[ id \circ s \xrightarrow{} s \]
+    \item \textbf{ShiftCons} : \[ \uparrow \circ (a.s)\xrightarrow{} s \]
+    \item \textbf{AssEnv} : \[ (s_1 \circ s_2) \circ s_3 \xrightarrow{} s_1 \circ (s_2 \circ s_3) \]
+    \item \textbf{MapEnv} : \[ (a.s) \circ t \xrightarrow{} a[t] . (s \circ t) \]
+    \item \textbf{IdR} : \[ s \circ id \xrightarrow{} s \]
+    \item \textbf{VarShift} : \[1.\uparrow \xrightarrow{} id \]
+    \item \textbf{Scons} : \[ 1[s].(\uparrow \circ s) \xrightarrow{} s \]
+    \item \textbf{Eta} : \[ \lambda (a \, 1) \xrightarrow{} b \text{ si $a=_\sigma b[\uparrow]$} \]
+
+\end{description}
+
+\paragraph{Implémentation}
+
+L'implémentation de ces règles est :
+\begin{lstlisting}
+let beta_red_s (t: s_term) =
+  match t with
+  | S_App (S_Abs (ty, a), b) -> S_Tsub (a, Cons (b, Id))
+  | _ -> t
+
+let eta_red_s (t: s_term) =
+  match t with
+  | S_Abs (ty, S_App(a, S_One)) -> unshift_s a
+  | _ -> t
+
+(* All reduction rules for terms *)
+let reduce_term_s (t : s_term) =
+  match t with
+  | S_Tsub (S_App (a,b), s) -> S_App (S_Tsub (a,s), S_Tsub (b,s))
+  | S_Tsub (S_One, Cons (a,b)) -> a
+  | S_Tsub (a, Id) -> a
+  | S_Tsub (S_Abs (ty, a), s) -> S_Abs (ty, S_Tsub (a, Cons (S_One, Comp (s, Shift))))
+  | S_Tsub (S_Tsub (a,s),t) -> S_Tsub (a, Comp (s,t))
+  | _ -> t
+
+(* All reduction rules for subst *)
+let reduce_subst_s (s : s_subst) =
+  match s with
+  | Comp (Id, s1) -> s1
+  | Comp (Shift, Cons (a,s1)) -> s1
+  | Comp (Comp (s1, s2), s3) -> Comp (s1, Comp (s2,s3))
+  | Comp (Cons (a,s1),t) -> Cons (S_Tsub (a,t), Comp (s1,t))
+  | Comp (s1, Id) -> s1
+  | Cons (S_One, Shift) -> Id
+  | Cons (S_Tsub (S_One, s1), Comp (Shift, s2)) -> if s1 = s2 then s1 else s
+  | _ -> s
+\end{lstlisting}
+
+\begin{prop}
+Les propriétés du \lsc{} (sans types et avec la règle $\eta$) sont :
+\begin{enumerate}
+    \item Le \lsc{} est localement confluent sur n'importe quel \lsterm{}, ouvert ou fermé.
+    \item Le \lsc{} est confluent sur les termes sans variables de substitutions
+    \item Le \lsc{} n'est pas confluent sur les termes avec des variables de substitutions.
+\end{enumerate}
+\end{prop}
+
 \subsubsection{$\eta$-long normal form}
-Dans cette partie nous allons définir la notion de $\eta$-long normal form utilisée par Dovek pour tenter de résoudre le problème de l'unification dans \cite{dowek1995higher}.
+Dans cette partie nous allons définir la notion de $\eta$-long normal form utilisée par Dowek pour tenter de résoudre le problème de l'unification dans \cite{dowek1995higher}.
 
 \begin{defn}
 Soit $a$ un \lsterm{} de type $A_1 \xrightarrow{} \dots \xrightarrow{} A_n \xrightarrow{} B$ dans le contexte $\Gamma$ et de la forme $\lambda\sigma$-normal. La $\eta$-long normal form de $a$, notée $a'$, est défini par :
 \begin{enumerate}
     \item Si $a = \lambda_Cb'$ alors $a' = \lambda_Cb'$.
-    \item Si $a = (\verb?k?b_1\dots b_p)$ alors $a' = \lambda_{A_1} \dots \lambda_{A_n}(n+n c_1\dots c_p \verb?n'?\dots \verb?1'?)$ avec $c_i$ la $\eta$-long normal form de la forme normale de $b_i[\uparrow^n]$.
-    \item Si $a = (X[s]b_1\dots b_p$ alors $a' = \lambda_{A_1}\dots \lambda_{A_n}(X[s']c_1\dots c_p\verb?n'?\dots \verb?1'?)$ avec $c_i$ la $\eta$-long normal form de la forme normale de $b_i[\uparrow^n]$ et si $s = d_1\dots d_q.\uparrow^k$ alors $s' = e_1\dots e_q.\uparrow^k+n$ où $e_i$ est $\eta$-long form de $d_i[\uparrow^n]$.
+    \item Si $a = (\verb?k?b_1\dots b_p)$ alors $a' = \lambda_{A_1} \dots \lambda_{A_n}(k+n\ c_1\dots c_p\  \verb?n'?\dots \verb?1'?)$ avec $c_i$ la $\eta$-long normal form de la forme normale de $b_i[\uparrow^n]$.
+    \item Si $a = (X[s]b_1\dots b_p$ alors $a' = \lambda_{A_1}\dots \lambda_{A_n}(X[s']\ c_1\dots c_p\ \verb?n'?\dots \verb?1'?)$ avec $c_i$ la $\eta$-long normal form de la forme normale de $b_i[\uparrow^n]$ et si $s = d_1\dots d_q.\uparrow^k$ alors $s' = e_1\dots e_q.\uparrow^{k+n}$ où $e_i$ est $\eta$-long form de $d_i[\uparrow^n]$.
 \end{enumerate}
+
 
 \begin{defn}
 La \textit{long normal form} d'un terme est la \textit{$\eta$-long form} de sa $\beta\eta$-normal form.
@@ -37,4 +111,35 @@ La \textit{long normal form} d'un terme est la \textit{$\eta$-long form} de sa $
 \begin{prop}
 Deux termes sont $\beta\eta$-équivalents si et seulement si ils ont la même \textit{long normal form}. 
 \end{prop}
+
+\paragraph{Implémentation}
+
+Voici l'implémentation de la $\eta$-long normal forme que nous utilisons pour notre fonction d'unification (TODO METTRE LA REF).
+
+\begin{lstlisting}
+let rec eta_long_normal_form (t : s_term) (typ : ty) (m_c : meta_var_str) : s_term =
+  match t with
+  | S_One | S_Xvar _ | S_Tsub (_,_) -> t
+  | S_App (t1,t2) -> 
+        let (ty,rest) = get_before_last_type typ in
+        let left = (match t1 with
+            | S_One -> S_Tsub (S_One,(s_shift_n 2))
+            | S_Tsub(S_One,s1) -> S_Tsub(S_One,Comp(Shift,s1))
+            | S_Tsub(S_Xvar n,s1) ->
+               let meta_type = fst (Map_str.find n m_c) in 
+               let s_prime = 
+                 apply_fun_subst s1 (fun t -> eta_long_normal_form t meta_type m_c) in S_Tsub(S_Xvar n,s_prime)
+            | _ -> failwith "eta_long_normal_form can't happend you should be in normal form") in
+        let right = eta_long_normal_form (normalise_lambda_sigma (S_Tsub(t2,(s_shift_n 1)))) rest m_c in 
+                     S_Abs(ty,S_App(left,right))
+  | S_Abs (ty1,t1) ->
+     S_Abs(ty1,eta_long_normal_form t1 typ m_c)
+\end{lstlisting}
+
+La fonction est très proche de la définition cependant ont nécessite simplement une
+fonction auxiliaire afin de récupérer l'avant dernier type d'un type flèche :
+\verb|get_before_last_type| . La seule différence avec la définition est que au lieu de 
+considérer des applications n-aires on ne peut considérer qu'une application à la fois.
+
+
 \end{defn}
