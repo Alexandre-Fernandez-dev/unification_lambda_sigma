@@ -604,3 +604,31 @@ and unification_rec (s: and_list) (su : (and_list * unif_rules_ret list))
                                                                                 ct 
         | Nope -> None
         | Fail -> None))
+
+let rec al_mv_l_to_mvl (l : ((and_list * meta_var_str) list)) : meta_var_str list =
+  match l with
+  | [] -> []
+  | (a,b) :: tl -> b :: al_mv_l_to_mvl tl
+
+let rec al_mv_l_to_al (l : ((and_list * meta_var_str) list)) : and_list list =
+  match l with
+  | [] -> []
+  | (a,b) :: tl -> a :: al_mv_l_to_al tl
+      
+let unification (s: and_list) (ctx : meta_var_str) (ct : context) : (meta_var_str list) option =
+  match unification_rec s ([],[]) ctx ct with
+  | None -> None
+  | Some res -> Some (al_mv_l_to_mvl res)
+
+let rec and_list_pretty_print (l : and_list) =
+  match l with
+  | [] -> ()
+  | DecEq (s1,s2) :: tl-> print_sigma_term s1; print_string " = " ;print_sigma_term s2 ;print_string "\n";and_list_pretty_print tl
+  | Exp :: tl-> print_string "Exp";and_list_pretty_print tl
+      
+      
+
+let () = Printf.printf "\nStarting unification tests \n" 
+    
+    
+      
